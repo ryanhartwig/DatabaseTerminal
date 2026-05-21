@@ -19,5 +19,5 @@ interaction.init({
     config = config,
 })
 
-require("debug")  -- temporary: broad interaction logging
+require("dbg")  -- temporary: broad interaction logging
 print("[DBTerminal] Ready.\n")

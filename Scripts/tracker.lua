@@ -5,7 +5,7 @@ local state = require("state")
 local tracker = {}
 
 local BUILD_ACTION_NAME = "DA_AxumTrashcanData"
-local ACTOR_CLASS = "BP_BioBed_Buildable_C"
+local ACTOR_CLASS = "BP_ComputerTextInterface_Terminal_PlayerBuilt_C"
 
 local lastBuildAction = nil
 local terminalActors = {}  -- FName → { pos = {X, Y, Z} }

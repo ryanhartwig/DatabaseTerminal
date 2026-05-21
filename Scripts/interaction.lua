@@ -4,7 +4,7 @@
 local UEHelpers = require("UEHelpers")
 local interaction = {}
 
-local ACTOR_CLASS = "BP_BioBed_Buildable_C"
+local ACTOR_CLASS = "BP_ComputerTextInterface_Terminal_PlayerBuilt_C"
 
 local tracker = nil
 local ui = nil
@@ -73,10 +73,11 @@ function interaction.init(deps)
     scanner = deps.scanner
     config = deps.config
 
-    -- Hook InteractClient for BioBed actors
+    -- Hook InteractClient
     RegisterCustomEvent("InteractClient", function(self, ...)
         local actor = self:get()
         local className = actor:GetClass():GetFName():ToString()
+        print("[DBTerminal:debug] InteractClient: " .. className .. "\n")  -- TEMP
         if className ~= ACTOR_CLASS then return end
 
         local fname = actor:GetFName():ToString()
