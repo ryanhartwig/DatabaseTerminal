@@ -1,0 +1,10 @@
+# Database Terminal Configuration
+
+# Scan radius in meters from the terminal
+radius=25
+
+# How often to refresh the item list while open (seconds)
+refresh_interval=5
+
+# Show in-game toast notifications
+notify=true
