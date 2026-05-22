@@ -128,37 +128,42 @@ local function makeButton(root, text, onClick)
 end
 
 ----------------------------------------------------------------------
--- Container type icon paths (from game's IconBaker textures)
+-- Container type icons via UWEItemType Thumbnails (auto-loading TSoftObjectPtr)
 ----------------------------------------------------------------------
-local CONTAINER_ICON_PATHS = {
-    SN2Locker                           = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Wall_A_Icon.T_Locker_Wall_A_Icon",
-    BP_FloatingLocker_Carryable_C       = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
-    BP_Tailing_Chest_C                  = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
-    BP_BasicBatteryTerminal_C           = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_BatteryTerminal_Icon.T_BatteryTerminal_Icon",
-    BP_PowerCellTerminal_C              = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_PowerCellTerminal_Icon.T_PowerCellTerminal_Icon",
-    SN2Bioreactor                       = "/Game/UI/Beacons/Icons_new/T_Icon_PlantPing.T_Icon_PlantPing",
-    SN2ProcessorStation                 = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Processor_Icon.T_Processor_Icon",
-    SN2BoxOfHolding                     = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
-    BP_PlayerDied_Blackbox_Proto_C      = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
+local CONTAINER_ITEM_TYPES = {
+    SN2Locker                           = "DA_WallLocker_ItemType",
+    BP_FloatingLocker_Carryable_C       = "DA_FloatingLocker_Carryable_ItemType",
+    BP_Tailing_Chest_C                  = "DA_FloorLocker_ItemType",  -- closest match
+    BP_BasicBatteryTerminal_C           = "DA_BasicBatteryTerminal_ItemType",
+    BP_PowerCellTerminal_C              = "DA_PowerCellTerminal_ItemType",
+    SN2Bioreactor                       = "DA_Bioreactor_ItemType",
+    SN2ProcessorStation                 = "DA_Processor_ItemType",
+    SN2BoxOfHolding                     = "DA_StorageCache_ItemType",
+    BP_PlayerDied_Blackbox_Proto_C      = "DA_FloorLocker_ItemType",  -- fallback
 }
 
-local containerIconCache = {}
+local containerItemTypeCache = {}
 
-local function getContainerIcon(containerClass)
-    if containerIconCache[containerClass] ~= nil then return containerIconCache[containerClass] end
-    local path = CONTAINER_ICON_PATHS[containerClass]
-    if not path then
-        containerIconCache[containerClass] = false
+local function getContainerItemType(containerClass)
+    if containerItemTypeCache[containerClass] ~= nil then return containerItemTypeCache[containerClass] end
+    local targetName = CONTAINER_ITEM_TYPES[containerClass]
+    if not targetName then
+        containerItemTypeCache[containerClass] = false
         return nil
     end
-    -- Try StaticFindObject first
-    local tex = StaticFindObject(path)
-    -- If not found, try LoadAsset to force-load the texture
-    if not tex then
-        pcall(function() tex = LoadAsset(path) end)
+    -- Find the UWEItemType by name from all loaded instances
+    local allTypes = FindAllOf("UWEItemType")
+    if allTypes then
+        for _, itemType in ipairs(allTypes) do
+            local ok, name = pcall(function() return itemType:GetFName():ToString() end)
+            if ok and name == targetName then
+                containerItemTypeCache[containerClass] = itemType
+                return itemType
+            end
+        end
     end
-    containerIconCache[containerClass] = tex or false
-    return tex
+    containerItemTypeCache[containerClass] = false
+    return nil
 end
 
 ----------------------------------------------------------------------
@@ -355,10 +360,9 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
 
         local icon = makeImage(root)
         pcall(function()
-            icon:SetBrushFromSoftTexture(group.itemType.Thumbnail, false)
-            icon:SetDesiredSizeOverride({ X = 28, Y = 28 })
+            icon:SetBrushFromSoftTexture(group.itemType.Thumbnail, true)
         end)
-        local iconSize = makeSizeBox(root, 28, 28)
+        local iconSize = makeSizeBox(root, 32, 32)
         iconSize:SetContent(icon)
         itemHeader:AddChildToHorizontalBox(iconSize)
 
@@ -389,16 +393,15 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             local indent = makeSizeBox(root, 28, 1)
             subRow:AddChildToHorizontalBox(indent)
 
-            -- Container type icon
+            -- Container type icon (uses same TSoftObjectPtr pattern as item thumbnails)
             local containerIcon = makeImage(root)
-            local tex = getContainerIcon(container.containerClass)
-            if tex then
+            local containerType = getContainerItemType(container.containerClass)
+            if containerType then
                 pcall(function()
-                    containerIcon:SetBrushFromTexture(tex, false)
-                    containerIcon:SetDesiredSizeOverride({ X = 18, Y = 18 })
+                    containerIcon:SetBrushFromSoftTexture(containerType.Thumbnail, false)
                 end)
             end
-            local cIconSize = makeSizeBox(root, 18, 18)
+            local cIconSize = makeSizeBox(root, 20, 20)
             cIconSize:SetContent(containerIcon)
             subRow:AddChildToHorizontalBox(cIconSize)
 
