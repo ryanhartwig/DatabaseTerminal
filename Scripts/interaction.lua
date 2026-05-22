@@ -14,6 +14,23 @@ local config = nil
 local isOpen = false
 local currentTerminal = nil
 
+--- Hide the NoA terminal widget visually (keep it active for input management)
+local function hideCTIWidget()
+    local widgets = FindAllOf("WBP_ComputerTextInterface_C")
+    if not widgets then return end
+    for _, widget in ipairs(widgets) do
+        if widget:IsValid() then
+            pcall(function()
+                if widget:IsActivated() then
+                    -- SetVisibility(Hidden) = 1, Collapsed = 2
+                    widget:SetVisibility(1)
+                    print("[DBTerminal] Hid NoA widget\n")
+                end
+            end)
+        end
+    end
+end
+
 function interaction.isOpen()
     return isOpen
 end
@@ -27,12 +44,6 @@ function interaction.close()
     if ui then ui.close() end
     isOpen = false
     currentTerminal = nil
-
-    local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
-    local pc = UEHelpers:GetPlayerController()
-    if pc and wbLib then
-        pcall(function() wbLib:SetInputMode_GameOnly(pc, true) end)
-    end
     print("[DBTerminal] UI closed.\n")
 end
 
@@ -52,17 +63,37 @@ local function open(actor)
     print(string.format("[DBTerminal] Scan: %d items, %d containers, %d types\n",
         totalItems, containerCount, #groups))
 
-    -- Open the UI
+    -- Pull callback — move one item from container to player inventory
+    local function onPull(container, itemEntry)
+        local pawn = UEHelpers:GetPlayerController().Pawn
+        if not pawn or not pawn:IsValid() then return end
+        local playerInv = pawn.InventoryComponent
+        if not playerInv or not playerInv:IsValid() then return end
+
+        if playerInv:IsFull() then
+            print("[DBTerminal] Inventory full!\n")
+            return
+        end
+
+        local ok, err = pcall(function()
+            playerInv:MoveItemBetweenInventories(
+                itemEntry.itemId,
+                itemEntry.inventoryId,
+                playerInv.InventoryId
+            )
+        end)
+        if ok then
+            print(string.format("[DBTerminal] Pulled %s from %s\n",
+                itemEntry.displayName, container.label))
+        else
+            print(string.format("[DBTerminal] Pull failed: %s\n", tostring(err)))
+        end
+    end
+
+    -- Open the UI (stacks on top of NoA widget which handles input mode)
     ui.open(groups, function()
         interaction.close()
-    end)
-
-    -- Capture input
-    local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
-    local pc = UEHelpers:GetPlayerController()
-    if pc and wbLib and ui.getRoot() then
-        pcall(function() wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true) end)
-    end
+    end, onPull)
 
     print("[DBTerminal] UI opened.\n")
 end
@@ -93,7 +124,13 @@ function interaction.init(deps)
 
         print("[DBTerminal] Terminal interaction detected\n")
         ExecuteInGameThread(function()
-            open(actor)
+            -- Let the NoA widget open, then hide it and open ours
+            ExecuteWithDelay(100, function()
+                ExecuteInGameThread(function()
+                    hideCTIWidget()
+                    open(actor)
+                end)
+            end)
         end)
     end)
 
