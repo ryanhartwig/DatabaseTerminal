@@ -78,7 +78,7 @@ function scanner.scan(terminalPos, radiusMeters)
                                             typeName = typeName,
                                             itemId = s.ItemId,
                                             inventoryId = invId,
-                                            count = s.Count,
+                                            count = 1,  -- each entry = 1 item (Count field is unreliable)
                                             lockerLabel = label,
                                             lockerInv = inv,
                                             itemType = s.ItemType,

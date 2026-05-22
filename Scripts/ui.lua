@@ -218,8 +218,8 @@ local function buildHeader(root, canvas, groups)
     end
 
     local statsStr = string.format("%d items | %d containers", totalItems, totalContainers)
-    local stats = makeText(root, statsStr)
-    local statsSlot = canvas:AddChildToCanvas(stats)
+    statsWidget = makeText(root, statsStr)
+    local statsSlot = canvas:AddChildToCanvas(statsWidget)
     statsSlot:SetAnchors({ Minimum = { X = PANEL.R-0.22, Y = T+0.018 }, Maximum = { X = PANEL.R-0.22, Y = T+0.018 } })
     statsSlot:SetAutoSize(true)
 
@@ -233,8 +233,68 @@ end
 ----------------------------------------------------------------------
 -- Content area (ScrollBox with item groups)
 ----------------------------------------------------------------------
+
+-- Widget references for live updates
+local statsWidget = nil
+local groupWidgets = {}  -- { groupBox, countText, subRows: { subRow, countText, container, group } }
+
+local function updateStatsText()
+    if not statsWidget or not scanGroups then return end
+    local totalItems = 0
+    local totalContainers = 0
+    for _, group in ipairs(scanGroups) do
+        totalItems = totalItems + group.totalCount
+        totalContainers = totalContainers + #group.containerList
+    end
+    pcall(function()
+        statsWidget:SetText(FText(string.format("%d items | %d containers", totalItems, totalContainers)))
+    end)
+end
+
+--- Called after a successful pull — update counts and hide empty rows
+function ui.onPullComplete(container, group)
+    -- Decrement counts
+    container.count = container.count - 1
+    group.totalCount = group.totalCount - 1
+    table.remove(container.items, 1)
+
+    -- Update group widgets
+    for _, gw in ipairs(groupWidgets) do
+        if gw.group == group then
+            -- Update group header count
+            pcall(function()
+                gw.countText:SetText(FText("  x" .. group.totalCount))
+            end)
+
+            -- Update sub-row counts
+            for _, sr in ipairs(gw.subRows) do
+                if sr.container == container then
+                    if container.count <= 0 then
+                        -- Collapse the empty sub-row (1 = Collapsed in UE5)
+                        pcall(function() sr.subRow:SetVisibility(1) end)
+                    else
+                        pcall(function()
+                            sr.countText:SetText(FText("  x" .. container.count .. "  "))
+                        end)
+                    end
+                end
+            end
+
+            -- Hide entire group if total is 0
+            if group.totalCount <= 0 then
+                pcall(function() gw.groupBox:SetVisibility(1) end)
+            end
+        end
+    end
+
+    -- Update header stats
+    updateStatsText()
+end
+
 local function buildContent(root, canvas, scrollBox, groups, pullCallback)
-    -- Position scrollbox in content area
+    groupWidgets = {}
+
+    -- Position scrollbox
     local contentTop = PANEL.T + PANEL.HEADER_H + 0.015
     local contentBot = PANEL.B - 0.05
     local scrollSlot = canvas:AddChildToCanvas(scrollBox)
@@ -254,11 +314,11 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
     -- Item groups
     for _, group in ipairs(groups) do
         local groupBox = makeVBox(root)
+        local gw = { groupBox = groupBox, group = group, countText = nil, subRows = {} }
 
         -- Item header: icon + name + total count
         local itemHeader = makeHBox(root)
 
-        -- Thumbnail
         local icon = makeImage(root)
         pcall(function()
             icon:SetBrushFromSoftTexture(group.itemType.Thumbnail, true)
@@ -267,13 +327,12 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         iconSize:SetContent(icon)
         itemHeader:AddChildToHorizontalBox(iconSize)
 
-        -- Name
         local nameText = makeText(root, "  " .. group.displayName)
         itemHeader:AddChildToHorizontalBox(nameText)
 
-        -- Count
         local countText = makeText(root, "  x" .. group.totalCount)
         itemHeader:AddChildToHorizontalBox(countText)
+        gw.countText = countText
 
         groupBox:AddChildToVerticalBox(itemHeader)
 
@@ -287,18 +346,24 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             local subCount = makeText(root, "  x" .. container.count .. "  ")
             subRow:AddChildToHorizontalBox(subCount)
 
-            -- PULL button
             local pullBtn = makeButton(root, "PULL", function()
                 if pullCallback and #container.items > 0 then
-                    pullCallback(container, container.items[1])
+                    pullCallback(container, container.items[1], group)
                 end
             end)
             subRow:AddChildToHorizontalBox(pullBtn)
 
             groupBox:AddChildToVerticalBox(subRow)
+
+            table.insert(gw.subRows, {
+                subRow = subRow,
+                countText = subCount,
+                container = container,
+            })
         end
 
         scrollBox:AddChild(groupBox)
+        table.insert(groupWidgets, gw)
     end
 end
 
@@ -381,6 +446,8 @@ end
 
 function ui.close()
     buttonActions = {}
+    groupWidgets = {}
+    statsWidget = nil
 
     if root then
         pcall(function() root:RemoveFromViewport() end)

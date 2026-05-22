@@ -131,7 +131,7 @@ local function open(actor)
         totalItems, containerCount, #groups))
 
     -- Pull callback — move one item from container to player inventory
-    local function onPull(container, itemEntry)
+    local function onPull(container, itemEntry, group)
         local pawn = UEHelpers:GetPlayerController().Pawn
         if not pawn or not pawn:IsValid() then return end
         local playerInv = pawn.InventoryComponent
@@ -152,6 +152,8 @@ local function open(actor)
         if ok then
             print(string.format("[DBTerminal] Pulled %s from %s\n",
                 itemEntry.displayName, container.label))
+            -- Update UI live
+            ui.onPullComplete(container, group)
         else
             print(string.format("[DBTerminal] Pull failed: %s\n", tostring(err)))
         end
