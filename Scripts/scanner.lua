@@ -41,11 +41,23 @@ function scanner.scan(terminalPos, radiusMeters)
     local radiusUnits = radiusMeters * 100  -- UE uses centimeters
 
     local containerSources = {
+        -- Lockers (floor, wall, lifepod)
         { class = "SN2Locker",                       getInv = function(a) return a.Inventory end,            labelFn = getLockerLabel },
+        -- Portable/floating lockers
+        { class = "BP_FloatingLocker_Carryable_C",   getInv = function(a) return a.UWEInventory end,         labelFn = function() return "Portable Locker" end },
+        -- Tailing chests
         { class = "BP_Tailing_Chest_C",              getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Tailing Chest" end },
+        -- Chargers
         { class = "BP_BasicBatteryTerminal_C",       getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Battery Charger" end },
         { class = "BP_PowerCellTerminal_C",          getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Power Cell Charger" end },
+        -- Bioreactor
+        { class = "SN2Bioreactor",                   getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Bioreactor" end },
+        -- Processor (input + output inventories)
+        { class = "SN2ProcessorStation",             getInv = function(a) return a.OutputInventory end,      labelFn = function() return "Processor Output" end },
+        { class = "SN2ProcessorStation",             getInv = function(a) return a.InputInventory end,       labelFn = function() return "Processor Input" end },
+        -- Storage cache
         { class = "SN2BoxOfHolding",                 getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Storage Cache" end },
+        -- Blackbox
         { class = "BP_PlayerDied_Blackbox_Proto_C",  getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Blackbox" end },
     }
 

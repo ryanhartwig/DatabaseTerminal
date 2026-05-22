@@ -188,50 +188,18 @@ function interaction.init(deps)
 
         print("[DBTerminal] Terminal interaction detected\n")
 
-        -- Try to prevent the NoA widget from ever opening by ending the
-        -- interaction immediately.  InteractEndClient is a native UFunction
-        -- on the terminal Blueprint — calling it here (while InteractClient
-        -- is still executing) should cancel the widget-open path.
-        local pc = UEHelpers:GetPlayerController()
-        local pawn = pc and pc.Pawn
-        local endOk = false
-        if pawn and pawn:IsValid() then
-            endOk = pcall(function() actor:InteractEndClient(pc, pawn) end)
-            if endOk then
-                print("[DBTerminal] InteractEndClient fired — NoA widget should be suppressed\n")
-            else
-                print("[DBTerminal] InteractEndClient failed — falling back to loading screen\n")
-            end
-        end
-
         ExecuteInGameThread(function()
-            if endOk then
-                -- InteractEndClient succeeded: NoA widget should not appear.
-                -- Small delay for input mode to settle, then open our UI
-                -- with our own input capture.
-                ExecuteWithDelay(50, function()
-                    ExecuteInGameThread(function()
-                        -- Hide any CTI widget that slipped through anyway
-                        hideCTIWidget()
-                        open(actor)
-                        -- Set up our own input mode (NoA widget is not managing it)
-                        local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
-                        if pc and wbLib and ui.getRoot() then
-                            pcall(function() wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true) end)
-                        end
-                    end)
+            -- Loading screen immediately masks the NoA widget
+            showLoadingScreen()
+
+            -- Let NoA widget activate (sets up cursor/input), then hide + open ours
+            ExecuteWithDelay(80, function()
+                ExecuteInGameThread(function()
+                    hideCTIWidget()
+                    removeLoadingScreen()
+                    open(actor)
                 end)
-            else
-                -- Fallback: loading screen approach (InteractEndClient unavailable)
-                showLoadingScreen()
-                ExecuteWithDelay(50, function()
-                    ExecuteInGameThread(function()
-                        hideCTIWidget()
-                        removeLoadingScreen()
-                        open(actor)
-                    end)
-                end)
-            end
+            end)
         end)
     end)
 
