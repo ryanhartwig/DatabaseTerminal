@@ -134,8 +134,8 @@ local CONTAINER_ICON_PATHS = {
     SN2Locker                           = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Wall_A_Icon.T_Locker_Wall_A_Icon",
     BP_FloatingLocker_Carryable_C       = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
     BP_Tailing_Chest_C                  = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
-    BP_BasicBatteryTerminal_C           = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_Misc/T_AdvancedBattery_Icon.T_AdvancedBattery_Icon",
-    BP_PowerCellTerminal_C              = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_Misc/T_PowerCellStandard_Icon.T_PowerCellStandard_Icon",
+    BP_BasicBatteryTerminal_C           = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_BatteryTerminal_Icon.T_BatteryTerminal_Icon",
+    BP_PowerCellTerminal_C              = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_PowerCellTerminal_Icon.T_PowerCellTerminal_Icon",
     SN2Bioreactor                       = "/Game/UI/Beacons/Icons_new/T_Icon_PlantPing.T_Icon_PlantPing",
     SN2ProcessorStation                 = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Processor_Icon.T_Processor_Icon",
     SN2BoxOfHolding                     = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
@@ -355,10 +355,12 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
 
         local icon = makeImage(root)
         pcall(function()
-            icon:SetBrushFromSoftTexture(group.itemType.Thumbnail, true)
+            icon:SetBrushFromSoftTexture(group.itemType.Thumbnail, false)
             icon:SetDesiredSizeOverride({ X = 28, Y = 28 })
         end)
-        itemHeader:AddChildToHorizontalBox(icon)
+        local iconSize = makeSizeBox(root, 28, 28)
+        iconSize:SetContent(icon)
+        itemHeader:AddChildToHorizontalBox(iconSize)
 
         -- Small gap between icon and name
         local iconGap = makeSizeBox(root, 8, 1)
@@ -392,11 +394,13 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             local tex = getContainerIcon(container.containerClass)
             if tex then
                 pcall(function()
-                    containerIcon:SetBrushFromTexture(tex, true)
+                    containerIcon:SetBrushFromTexture(tex, false)
                     containerIcon:SetDesiredSizeOverride({ X = 18, Y = 18 })
                 end)
             end
-            subRow:AddChildToHorizontalBox(containerIcon)
+            local cIconSize = makeSizeBox(root, 18, 18)
+            cIconSize:SetContent(containerIcon)
+            subRow:AddChildToHorizontalBox(cIconSize)
 
             -- Small gap after icon
             local iconGap = makeSizeBox(root, 6, 1)
