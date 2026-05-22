@@ -77,7 +77,6 @@ function interaction.init(deps)
     RegisterCustomEvent("InteractClient", function(self, ...)
         local actor = self:get()
         local className = actor:GetClass():GetFName():ToString()
-        print("[DBTerminal:debug] InteractClient: " .. className .. "\n")  -- TEMP
         if className ~= ACTOR_CLASS then return end
 
         local fname = actor:GetFName():ToString()
@@ -87,6 +86,37 @@ function interaction.init(deps)
         ExecuteInGameThread(function()
             open(actor)
         end)
+    end)
+
+    -- Override hover text: when GetInteractionInfo fires for our terminal,
+    -- find the HUD TextBlock showing "NoA" and replace with our name
+    local hoveringOurTerminal = false
+
+    RegisterCustomEvent("GetInteractionInfo", function(self, ...)
+        local actor = self:get()
+        local cls = actor:GetClass():GetFName():ToString()
+        if cls ~= ACTOR_CLASS then
+            hoveringOurTerminal = false
+            return
+        end
+        local fname = actor:GetFName():ToString()
+        hoveringOurTerminal = tracker.isTerminal(fname)
+    end)
+
+    LoopAsync(100, function()
+        if not hoveringOurTerminal then return false end
+        local textBlocks = FindAllOf("TextBlock")
+        if textBlocks then
+            for _, tb in ipairs(textBlocks) do
+                if tb:IsValid() then
+                    local ok, text = pcall(function() return tb:GetText():ToString() end)
+                    if ok and text and text:find("NoA") then
+                        pcall(function() tb:SetText(FText("Use Database Terminal")) end)
+                    end
+                end
+            end
+        end
+        return false
     end)
 
     -- ESC to close

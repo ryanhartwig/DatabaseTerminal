@@ -47,7 +47,7 @@ function state.load()
     if #savedPositions == 0 then return terminalActors end
 
     -- Find BioBeds and match by position
-    local beds = FindAllOf("BP_BioBed_Buildable_C")
+    local beds = FindAllOf("BP_ComputerTextInterface_Terminal_PlayerBuilt_C")
     if not beds then return terminalActors end
 
     for _, bed in ipairs(beds) do
