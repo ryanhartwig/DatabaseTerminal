@@ -412,13 +412,14 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             local containerType = getContainerItemType(container.containerClass, container.sourceClass)
             if containerType then
                 pcall(function()
-                    containerIcon:SetBrushFromSoftTexture(containerType.Thumbnail, true)
+                    containerIcon:SetBrushFromSoftTexture(containerType.Thumbnail, false)
                     containerIcon:SetDesiredSizeOverride({ X = 24, Y = 24 })
                 end)
             end
             local cIconSlot = subRow:AddChildToHorizontalBox(containerIcon)
             pcall(function()
                 cIconSlot:SetVerticalAlignment(1)  -- 1 = Center
+                cIconSlot:SetSize({ SizeRule = 0, Value = 0.0 })  -- 0 = Auto (don't fill)
             end)
 
             -- Small gap after icon
