@@ -490,47 +490,8 @@ function ui.open(groups, closeCb, onPull)
 
     -- Show at high z-order
     root:AddToViewport(500)
-
-    -- Poll: if NoA widget closes (e.g. player walks away), close our UI too.
-    -- Grace period: skip the first few polls so we don't falsely detect
-    -- "no active CTI widget" when InteractEndClient prevented it from opening.
-    -- After the grace period, if a CTI widget IS active we monitor it; if none
-    -- ever appeared we just skip the auto-close (ESC/F6 keys still work).
-    local pollCount = 0
-    local ctiWasActive = false
-    LoopAsync(200, function()
-        if not root then return true end
-        pollCount = pollCount + 1
-
-        local ok, anyActive = pcall(function()
-            local ctiWidgets = FindAllOf("WBP_ComputerTextInterface_C")
-            if not ctiWidgets then return false end
-            for _, w in ipairs(ctiWidgets) do
-                if w:IsValid() then
-                    local activeOk, active = pcall(function() return w:IsActivated() end)
-                    if activeOk and active then return true end
-                end
-            end
-            return false
-        end)
-        if not ok then return true end  -- error = stop polling
-
-        if anyActive then ctiWasActive = true end
-
-        -- During grace period (first ~600ms), just observe
-        if pollCount <= 3 then return false end
-
-        -- After grace: only close if the CTI widget WAS active and is now gone
-        -- (i.e. the player walked away or the game closed it).
-        -- If it was never active (InteractEndClient path), skip auto-close.
-        if ctiWasActive and not anyActive and onCloseCb then
-            ExecuteInGameThread(function()
-                if onCloseCb then onCloseCb() end
-            end)
-            return true
-        end
-        return false
-    end)
+    -- Close via ESC/F6 keybinds in interaction.lua (no NoA widget polling needed
+    -- since CloseUI() prevents the NoA widget from ever opening)
 end
 
 function ui.close()

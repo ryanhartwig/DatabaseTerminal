@@ -13,70 +13,6 @@ local config = nil
 
 local isOpen = false
 local currentTerminal = nil
-local loadingWidget = nil
-
---- Show a loading screen that covers the NoA widget flash
-local function showLoadingScreen()
-    local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
-    local uwClass = StaticFindObject("/Script/UMG.UserWidget")
-    local canvasCls = StaticFindObject("/Script/UMG.CanvasPanel")
-    local imgCls = StaticFindObject("/Script/UMG.Image")
-    local textCls = StaticFindObject("/Script/UMG.TextBlock")
-
-    local pc = UEHelpers:GetPlayerController()
-    if not pc or not wbLib then return end
-
-    loadingWidget = wbLib:Create(pc, uwClass, pc)
-    if not loadingWidget then return end
-
-    local canvas = StaticConstructObject(canvasCls, loadingWidget, FName("LoadCanvas"))
-    loadingWidget.WidgetTree.RootWidget = canvas
-
-    -- Match the main UI panel size — fully opaque to cover NoA
-    local bg = StaticConstructObject(imgCls, loadingWidget, FName("LoadBG"))
-    pcall(function() bg:SetColorAndOpacity({ R=0.015, G=0.025, B=0.05, A=1.0 }) end)
-    local bgSlot = canvas:AddChildToCanvas(bg)
-    bgSlot:SetAnchors({ Minimum = { X=0.10, Y=0.05 }, Maximum = { X=0.90, Y=0.95 } })
-    bgSlot:SetAutoSize(false)
-
-    -- Top accent line (matches main UI)
-    local accent = StaticConstructObject(imgCls, loadingWidget, FName("LoadAccent"))
-    pcall(function() accent:SetColorAndOpacity({ R=0.1, G=0.65, B=0.95, A=0.85 }) end)
-    local accentSlot = canvas:AddChildToCanvas(accent)
-    accentSlot:SetAnchors({ Minimum = { X=0.10, Y=0.05 }, Maximum = { X=0.90, Y=0.054 } })
-    accentSlot:SetAutoSize(false)
-
-    -- Loading text centered
-    local txt = StaticConstructObject(textCls, loadingWidget, FName("LoadTxt"))
-    txt:SetText(FText("Scanning containers..."))
-    local txtSlot = canvas:AddChildToCanvas(txt)
-    txtSlot:SetAnchors({ Minimum = { X=0.42, Y=0.48 }, Maximum = { X=0.42, Y=0.48 } })
-    txtSlot:SetAutoSize(true)
-
-    loadingWidget:AddToViewport(499)
-end
-
-local function removeLoadingScreen()
-    if loadingWidget then
-        pcall(function() loadingWidget:RemoveFromViewport() end)
-        loadingWidget = nil
-    end
-end
-
---- Hide the NoA terminal widget visually (keep it active for input management)
-local function hideCTIWidget()
-    local widgets = FindAllOf("WBP_ComputerTextInterface_C")
-    if not widgets then return end
-    for _, widget in ipairs(widgets) do
-        if widget:IsValid() then
-            pcall(function()
-                -- SetVisibility: 0=Visible, 1=Hidden, 2=Collapsed
-                widget:SetVisibility(1)
-                print("[DBTerminal] Hid NoA widget\n")
-            end)
-        end
-    end
-end
 
 
 function interaction.isOpen()
@@ -93,22 +29,7 @@ function interaction.close()
     isOpen = false
     currentTerminal = nil
 
-    -- Restore CTI widget visibility and deactivate it properly (handles both
-    -- the InteractEndClient path where the widget may never have opened, and
-    -- the fallback path where it was hidden).
-    local widgets = FindAllOf("WBP_ComputerTextInterface_C")
-    if widgets then
-        for _, widget in ipairs(widgets) do
-            if widget:IsValid() then
-                pcall(function() widget:SetVisibility(0) end)
-                pcall(function() widget:DeactivateWidget() end)
-            end
-        end
-    end
-
-    -- Always restore game input — we now manage input ourselves via
-    -- SetInputMode_UIOnlyEx when the InteractEndClient path succeeds,
-    -- and the fallback path also needs this cleanup.
+    -- Restore game input (we manage it via SetInputMode_UIOnlyEx on open)
     local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
     local pc = UEHelpers:GetPlayerController()
     if pc and wbLib then
@@ -188,16 +109,28 @@ function interaction.init(deps)
 
         print("[DBTerminal] Terminal interaction detected\n")
 
-        ExecuteInGameThread(function()
-            -- Loading screen immediately masks the NoA widget
-            pcall(showLoadingScreen)
+        -- Suppress the NoA widget BEFORE it opens by calling CloseUI
+        -- on the CTI component. This prevents the widget push entirely.
+        pcall(function()
+            local comp = actor.BPC_ComputerTextInterface_Component
+            if comp and comp:IsValid() then
+                comp:CloseUI()
+            end
+        end)
 
-            -- Let NoA widget activate (sets up cursor/input), then hide + open ours
-            ExecuteWithDelay(80, function()
+        ExecuteInGameThread(function()
+            -- Open our UI directly — no loading screen needed
+            ExecuteWithDelay(50, function()
                 ExecuteInGameThread(function()
-                    pcall(hideCTIWidget)
-                    pcall(removeLoadingScreen)
-                    pcall(function() open(actor) end)
+                    pcall(function()
+                        open(actor)
+                        -- Set up our own input mode since NoA widget isn't managing it
+                        local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+                        local pc = UEHelpers:GetPlayerController()
+                        if pc and wbLib and ui.getRoot() then
+                            wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true)
+                        end
+                    end)
                 end)
             end)
         end)
@@ -253,17 +186,6 @@ function interaction.init(deps)
         end)
     end)
 
-    -- Also hook the NoA widget's own back/close buttons
-    RegisterCustomEvent("BP_OnDeactivated", function(self, ...)
-        if not isOpen then return end
-        local widget = self:get()
-        local cls = widget:GetClass():GetFName():ToString()
-        if cls == "WBP_ComputerTextInterface_C" then
-            ExecuteInGameThread(function()
-                interaction.close()
-            end)
-        end
-    end)
 end
 
 return interaction
