@@ -1,5 +1,5 @@
 -- DatabaseTerminal: UI module
--- ScrollBox inventory browser with PULL buttons
+-- ScrollBox inventory browser with polished background and PULL buttons
 
 local UEHelpers = require("UEHelpers")
 local ui = {}
@@ -33,7 +33,7 @@ local function newName(prefix)
     return FName(prefix .. "_" .. widgetCounter)
 end
 
-local function makeText(outer, str, size)
+local function makeText(outer, str)
     local tb = StaticConstructObject(classes.text, outer, newName("Txt"))
     if str then tb:SetText(FText(str)) end
     return tb
@@ -58,10 +58,20 @@ local function makeSizeBox(outer, width, height)
     return sb
 end
 
+--- Create a colored rectangle (Image with tint) anchored to the canvas
+local function makeRect(root, canvas, name, color, x1, y1, x2, y2)
+    local i = StaticConstructObject(classes.img, root, newName(name))
+    pcall(function() i:SetColorAndOpacity(color) end)
+    local s = canvas:AddChildToCanvas(i)
+    s:SetAnchors({ Minimum = { X = x1, Y = y1 }, Maximum = { X = x2, Y = y2 } })
+    s:SetAutoSize(false)
+    return i
+end
+
 ----------------------------------------------------------------------
--- Button system — uses game's CommonButtonBase via wbLib:Create
+-- Button system
 ----------------------------------------------------------------------
-local buttonActions = {}  -- address string → callback function
+local buttonActions = {}
 local buttonHookRegistered = false
 
 local function registerButtonHook()
@@ -73,21 +83,17 @@ local function registerButtonHook()
             local addr = tostring(widget:GetAddress())
             local action = buttonActions[addr]
             if action then
-                ExecuteInGameThread(function()
-                    action()
-                end)
+                ExecuteInGameThread(function() action() end)
             end
         end)
     end)
     buttonHookRegistered = true
 end
 
---- Find a game button class to use as template
 local cachedButtonClass = nil
 
 local function getButtonClass()
     if cachedButtonClass then return cachedButtonClass end
-    -- Try to find WBP_GenericButtonBig from loaded widgets
     local candidates = FindAllOf("CommonButtonBase")
     if candidates then
         for _, btn in ipairs(candidates) do
@@ -100,25 +106,20 @@ local function getButtonClass()
     return nil
 end
 
---- Create a clickable button with text and callback
-local function makeButton(outer, text, onClick)
+local function makeButton(root, text, onClick)
     local btnClass = getButtonClass()
     if not btnClass then
-        -- Fallback: return a text label (no click)
-        local label = makeText(outer, "[" .. text .. "]")
-        return label
+        return makeText(root, "[" .. text .. "]")
     end
 
     local pc = UEHelpers:GetPlayerController()
     local btn = classes.wbLib:Create(pc, btnClass, pc)
     if not btn then
-        return makeText(outer, "[" .. text .. "]")
+        return makeText(root, "[" .. text .. "]")
     end
 
-    -- Try to set the button text
     pcall(function() btn:SetText(FText(text)) end)
 
-    -- Register click handler
     if onClick then
         buttonActions[tostring(btn:GetAddress())] = onClick
     end
@@ -127,90 +128,163 @@ local function makeButton(outer, text, onClick)
 end
 
 ----------------------------------------------------------------------
--- UI State
+-- Panel layout constants
 ----------------------------------------------------------------------
-local root = nil
-local canvas = nil
-local scrollBox = nil
-local scanGroups = nil
-local onCloseCb = nil
-local pullCallback = nil  -- function(container, itemEntry)
+local PANEL = {
+    L = 0.10, R = 0.90, T = 0.05, B = 0.95,  -- panel bounds
+    GLOW = 0.008,                                -- outer glow size
+    HEADER_H = 0.065,                            -- header height from top
+    CONTENT_PAD = 0.02,                          -- content inset from panel edges
+}
 
-function ui.getRoot()
-    return root
+----------------------------------------------------------------------
+-- Background rendering
+----------------------------------------------------------------------
+local function buildBackground(root, canvas)
+    local L, R, T, B = PANEL.L, PANEL.R, PANEL.T, PANEL.B
+    local G = PANEL.GLOW
+
+    -- Outer glow
+    makeRect(root, canvas, "OuterGlow",
+        { R=0.04, G=0.12, B=0.22, A=0.6 },
+        L-G, T-G, R+G, B+G)
+
+    -- Main background
+    makeRect(root, canvas, "MainBG",
+        { R=0.015, G=0.025, B=0.05, A=0.94 },
+        L, T, R, B)
+
+    -- Top gradient
+    makeRect(root, canvas, "GradTop",
+        { R=0.05, G=0.10, B=0.18, A=0.35 },
+        L, T, R, T+0.12)
+
+    -- Bottom gradient
+    makeRect(root, canvas, "GradBot",
+        { R=0.005, G=0.01, B=0.02, A=0.4 },
+        L, B-0.08, R, B)
+
+    -- Accent lines
+    makeRect(root, canvas, "AccentTop",
+        { R=0.1, G=0.65, B=0.95, A=0.85 },
+        L, T, R, T+0.004)
+
+    makeRect(root, canvas, "AccentBot",
+        { R=0.06, G=0.35, B=0.6, A=0.5 },
+        L, B-0.003, R, B)
+
+    makeRect(root, canvas, "AccentLeft",
+        { R=0.06, G=0.35, B=0.6, A=0.3 },
+        L, T, L+0.002, B)
+
+    makeRect(root, canvas, "AccentRight",
+        { R=0.06, G=0.35, B=0.6, A=0.3 },
+        R-0.002, T, R, B)
+
+    -- Header separator
+    makeRect(root, canvas, "SepHeader",
+        { R=0.08, G=0.4, B=0.65, A=0.45 },
+        L+PANEL.CONTENT_PAD, T+PANEL.HEADER_H, R-PANEL.CONTENT_PAD, T+PANEL.HEADER_H+0.003)
+
+    -- Content area inner border
+    makeRect(root, canvas, "InnerBorder",
+        { R=0.03, G=0.08, B=0.15, A=0.3 },
+        L+0.015, T+PANEL.HEADER_H+0.01, R-0.015, B-0.015)
+
+    -- Footer separator
+    makeRect(root, canvas, "FooterSep",
+        { R=0.08, G=0.4, B=0.65, A=0.25 },
+        L+PANEL.CONTENT_PAD, B-0.045, R-PANEL.CONTENT_PAD, B-0.042)
 end
 
 ----------------------------------------------------------------------
--- Build the widget tree from scan data
+-- Header bar
 ----------------------------------------------------------------------
-local function buildContent()
-    if not scrollBox or not scanGroups then return end
+local function buildHeader(root, canvas, groups)
+    local L, T = PANEL.L, PANEL.T
 
-    -- Header bar
-    local header = makeHBox(root)
-    local titleText = makeText(root, "DATABASE TERMINAL")
-    header:AddChildToHorizontalBox(titleText)
+    -- Title
+    local title = makeText(root, "DATABASE TERMINAL")
+    local titleSlot = canvas:AddChildToCanvas(title)
+    titleSlot:SetAnchors({ Minimum = { X = L+0.025, Y = T+0.018 }, Maximum = { X = L+0.025, Y = T+0.018 } })
+    titleSlot:SetAutoSize(true)
 
     -- Stats
     local totalItems = 0
     local totalContainers = 0
-    for _, group in ipairs(scanGroups) do
+    for _, group in ipairs(groups) do
         totalItems = totalItems + group.totalCount
         totalContainers = totalContainers + #group.containerList
     end
-    local statsText = makeText(root, string.format("    %d items | %d containers    [ESC] Close", totalItems, totalContainers))
-    header:AddChildToHorizontalBox(statsText)
 
-    local headerSlot = canvas:AddChildToCanvas(header)
-    headerSlot:SetAnchors({ Minimum = { X = 0.15, Y = 0.08 }, Maximum = { X = 0.85, Y = 0.08 } })
-    headerSlot:SetAutoSize(true)
+    local statsStr = string.format("%d items | %d containers", totalItems, totalContainers)
+    local stats = makeText(root, statsStr)
+    local statsSlot = canvas:AddChildToCanvas(stats)
+    statsSlot:SetAnchors({ Minimum = { X = PANEL.R-0.22, Y = T+0.018 }, Maximum = { X = PANEL.R-0.22, Y = T+0.018 } })
+    statsSlot:SetAutoSize(true)
 
-    -- ScrollBox positioned below header
+    -- Footer version
+    local ver = makeText(root, "Database Terminal v0.1.0")
+    local verSlot = canvas:AddChildToCanvas(ver)
+    verSlot:SetAnchors({ Minimum = { X = L+0.025, Y = PANEL.B-0.035 }, Maximum = { X = L+0.025, Y = PANEL.B-0.035 } })
+    verSlot:SetAutoSize(true)
+end
+
+----------------------------------------------------------------------
+-- Content area (ScrollBox with item groups)
+----------------------------------------------------------------------
+local function buildContent(root, canvas, scrollBox, groups, pullCallback)
+    -- Position scrollbox in content area
+    local contentTop = PANEL.T + PANEL.HEADER_H + 0.015
+    local contentBot = PANEL.B - 0.05
     local scrollSlot = canvas:AddChildToCanvas(scrollBox)
-    scrollSlot:SetAnchors({ Minimum = { X = 0.15, Y = 0.13 }, Maximum = { X = 0.85, Y = 0.88 } })
+    scrollSlot:SetAnchors({
+        Minimum = { X = PANEL.L + PANEL.CONTENT_PAD + 0.01, Y = contentTop },
+        Maximum = { X = PANEL.R - PANEL.CONTENT_PAD - 0.01, Y = contentBot }
+    })
     scrollSlot:SetAutoSize(false)
 
     -- Empty state
-    if #scanGroups == 0 then
+    if #groups == 0 then
         local emptyText = makeText(root, "No items found in nearby containers.")
         scrollBox:AddChild(emptyText)
         return
     end
 
     -- Item groups
-    for _, group in ipairs(scanGroups) do
+    for _, group in ipairs(groups) do
         local groupBox = makeVBox(root)
 
-        -- Item header row: icon + name + total count
+        -- Item header: icon + name + total count
         local itemHeader = makeHBox(root)
 
-        -- Thumbnail icon
+        -- Thumbnail
         local icon = makeImage(root)
         pcall(function()
             icon:SetBrushFromSoftTexture(group.itemType.Thumbnail, true)
         end)
-        local iconSize = makeSizeBox(root, 32, 32)
+        local iconSize = makeSizeBox(root, 28, 28)
         iconSize:SetContent(icon)
         itemHeader:AddChildToHorizontalBox(iconSize)
 
-        -- Item name + total count
-        local nameText = makeText(root, string.format("  %s", group.displayName))
+        -- Name
+        local nameText = makeText(root, "  " .. group.displayName)
         itemHeader:AddChildToHorizontalBox(nameText)
 
-        local countText = makeText(root, string.format("  x%d", group.totalCount))
+        -- Count
+        local countText = makeText(root, "  x" .. group.totalCount)
         itemHeader:AddChildToHorizontalBox(countText)
 
         groupBox:AddChildToVerticalBox(itemHeader)
 
-        -- Sub-rows: one per container holding this item
+        -- Sub-rows per container
         for _, container in ipairs(group.containerList) do
             local subRow = makeHBox(root)
 
-            -- Indented label + count
-            local labelText = makeText(root, string.format("        %s", container.label))
+            local labelText = makeText(root, "        " .. container.label)
             subRow:AddChildToHorizontalBox(labelText)
 
-            local subCount = makeText(root, string.format("  x%d  ", container.count))
+            local subCount = makeText(root, "  x" .. container.count .. "  ")
             subRow:AddChildToHorizontalBox(subCount)
 
             -- PULL button
@@ -226,6 +300,20 @@ local function buildContent()
 
         scrollBox:AddChild(groupBox)
     end
+end
+
+----------------------------------------------------------------------
+-- UI State
+----------------------------------------------------------------------
+local root = nil
+local canvas = nil
+local scrollBox = nil
+local scanGroups = nil
+local onCloseCb = nil
+local pullCallback = nil
+
+function ui.getRoot()
+    return root
 end
 
 ----------------------------------------------------------------------
@@ -247,7 +335,7 @@ function ui.open(groups, closeCb, onPull)
     local pc = UEHelpers:GetPlayerController()
     if not pc then return end
 
-    -- Create root widget
+    -- Create root
     root = classes.wbLib:Create(pc, classes.uwClass, pc)
     if not root then
         print("[DBTerminal] Failed to create root widget\n")
@@ -257,18 +345,20 @@ function ui.open(groups, closeCb, onPull)
     canvas = StaticConstructObject(classes.canvas, root, FName("Canvas"))
     root.WidgetTree.RootWidget = canvas
 
-    -- Create scroll box
+    -- Build layers
+    buildBackground(root, canvas)
+    buildHeader(root, canvas, groups)
+
+    -- ScrollBox
     scrollBox = StaticConstructObject(classes.scroll, root, FName("ScrollArea"))
+    buildContent(root, canvas, scrollBox, groups, pullCallback)
 
-    -- Build content
-    buildContent()
-
-    -- Show at high z-order (above the NoA widget)
+    -- Show at high z-order
     root:AddToViewport(500)
 
-    -- Poll: if the NoA widget closes (player pressed ESC), close our UI too
+    -- Poll: if NoA widget closes, close our UI too
     LoopAsync(200, function()
-        if not root then return true end  -- we're already closed
+        if not root then return true end
         local ctiWidgets = FindAllOf("WBP_ComputerTextInterface_C")
         local anyActive = false
         if ctiWidgets then
@@ -290,7 +380,6 @@ function ui.open(groups, closeCb, onPull)
 end
 
 function ui.close()
-    -- Clear button actions for our widgets
     buttonActions = {}
 
     if root then

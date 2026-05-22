@@ -13,6 +13,55 @@ local config = nil
 
 local isOpen = false
 local currentTerminal = nil
+local loadingWidget = nil
+
+--- Show a loading screen that covers the NoA widget flash
+local function showLoadingScreen()
+    local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+    local uwClass = StaticFindObject("/Script/UMG.UserWidget")
+    local canvasCls = StaticFindObject("/Script/UMG.CanvasPanel")
+    local imgCls = StaticFindObject("/Script/UMG.Image")
+    local textCls = StaticFindObject("/Script/UMG.TextBlock")
+
+    local pc = UEHelpers:GetPlayerController()
+    if not pc or not wbLib then return end
+
+    loadingWidget = wbLib:Create(pc, uwClass, pc)
+    if not loadingWidget then return end
+
+    local canvas = StaticConstructObject(canvasCls, loadingWidget, FName("LoadCanvas"))
+    loadingWidget.WidgetTree.RootWidget = canvas
+
+    -- Match the main UI panel size — fully opaque to cover NoA
+    local bg = StaticConstructObject(imgCls, loadingWidget, FName("LoadBG"))
+    pcall(function() bg:SetColorAndOpacity({ R=0.015, G=0.025, B=0.05, A=1.0 }) end)
+    local bgSlot = canvas:AddChildToCanvas(bg)
+    bgSlot:SetAnchors({ Minimum = { X=0.10, Y=0.05 }, Maximum = { X=0.90, Y=0.95 } })
+    bgSlot:SetAutoSize(false)
+
+    -- Top accent line (matches main UI)
+    local accent = StaticConstructObject(imgCls, loadingWidget, FName("LoadAccent"))
+    pcall(function() accent:SetColorAndOpacity({ R=0.1, G=0.65, B=0.95, A=0.85 }) end)
+    local accentSlot = canvas:AddChildToCanvas(accent)
+    accentSlot:SetAnchors({ Minimum = { X=0.10, Y=0.05 }, Maximum = { X=0.90, Y=0.054 } })
+    accentSlot:SetAutoSize(false)
+
+    -- Loading text centered
+    local txt = StaticConstructObject(textCls, loadingWidget, FName("LoadTxt"))
+    txt:SetText(FText("Scanning containers..."))
+    local txtSlot = canvas:AddChildToCanvas(txt)
+    txtSlot:SetAnchors({ Minimum = { X=0.42, Y=0.48 }, Maximum = { X=0.42, Y=0.48 } })
+    txtSlot:SetAutoSize(true)
+
+    loadingWidget:AddToViewport(499)
+end
+
+local function removeLoadingScreen()
+    if loadingWidget then
+        pcall(function() loadingWidget:RemoveFromViewport() end)
+        loadingWidget = nil
+    end
+end
 
 --- Hide the NoA terminal widget visually (keep it active for input management)
 local function hideCTIWidget()
@@ -129,24 +178,19 @@ function interaction.init(deps)
         if className ~= ACTOR_CLASS then return end
 
         local fname = actor:GetFName():ToString()
-        local isOurs = tracker.isTerminal(fname)
-        print(string.format("[DBTerminal] InteractClient: %s | isTerminal=%s\n", fname, tostring(isOurs)))
-
-        -- Debug: print all tracked terminals
-        local tracked = tracker.getTerminals()
-        for k, _ in pairs(tracked) do
-            print("[DBTerminal]   tracked: " .. k .. "\n")
-        end
-
-        if not isOurs then return end
+        if not tracker.isTerminal(fname) then return end
 
         print("[DBTerminal] Terminal interaction detected\n")
 
         ExecuteInGameThread(function()
-            -- Let the NoA widget fully activate (sets up cursor/input), then hide it
-            ExecuteWithDelay(80, function()
+            -- Show loading screen immediately (masks the NoA widget)
+            showLoadingScreen()
+
+            -- Let the NoA widget activate (sets up cursor), then hide + open ours
+            ExecuteWithDelay(100, function()
                 ExecuteInGameThread(function()
                     hideCTIWidget()
+                    removeLoadingScreen()
                     open(actor)
                 end)
             end)
