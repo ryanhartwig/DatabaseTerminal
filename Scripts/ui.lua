@@ -2,6 +2,7 @@
 -- ScrollBox inventory browser with polished background and PULL buttons
 
 local UEHelpers = require("UEHelpers")
+local textures = require("textures")
 local ui = {}
 
 ----------------------------------------------------------------------
@@ -198,42 +199,48 @@ local function buildBackground(root, canvas)
     local L, R, T, B = PANEL.L, PANEL.R, PANEL.T, PANEL.B
     local G = PANEL.GLOW
 
-    -- Outer glow
-    makeRect(root, canvas, "OuterGlow",
-        { R=0.04, G=0.12, B=0.22, A=0.6 },
-        L-G, T-G, R+G, B+G)
+    -- Try custom texture background first
+    local bgTex = textures.get("Background")
+    if bgTex then
+        local bg = StaticConstructObject(classes.img, root, newName("BG"))
+        pcall(function() bg:SetBrushFromTexture(bgTex, false) end)
+        local bgSlot = canvas:AddChildToCanvas(bg)
+        bgSlot:SetAnchors({ Minimum = { X = L, Y = T }, Maximum = { X = R, Y = B } })
+        bgSlot:SetAutoSize(false)
+    else
+        -- Fallback: rectangle-based background
+        makeRect(root, canvas, "OuterGlow",
+            { R=0.04, G=0.12, B=0.22, A=0.6 },
+            L-G, T-G, R+G, B+G)
 
-    -- Main background
-    makeRect(root, canvas, "MainBG",
-        { R=0.015, G=0.025, B=0.05, A=0.94 },
-        L, T, R, B)
+        makeRect(root, canvas, "MainBG",
+            { R=0.015, G=0.025, B=0.05, A=0.94 },
+            L, T, R, B)
 
-    -- Top gradient
-    makeRect(root, canvas, "GradTop",
-        { R=0.05, G=0.10, B=0.18, A=0.35 },
-        L, T, R, T+0.12)
+        makeRect(root, canvas, "GradTop",
+            { R=0.05, G=0.10, B=0.18, A=0.35 },
+            L, T, R, T+0.12)
 
-    -- Bottom gradient
-    makeRect(root, canvas, "GradBot",
-        { R=0.005, G=0.01, B=0.02, A=0.4 },
-        L, B-0.08, R, B)
+        makeRect(root, canvas, "GradBot",
+            { R=0.005, G=0.01, B=0.02, A=0.4 },
+            L, B-0.08, R, B)
 
-    -- Accent lines
-    makeRect(root, canvas, "AccentTop",
-        { R=0.1, G=0.65, B=0.95, A=0.85 },
-        L, T, R, T+0.004)
+        makeRect(root, canvas, "AccentTop",
+            { R=0.1, G=0.65, B=0.95, A=0.85 },
+            L, T, R, T+0.004)
 
-    makeRect(root, canvas, "AccentBot",
-        { R=0.06, G=0.35, B=0.6, A=0.5 },
-        L, B-0.003, R, B)
+        makeRect(root, canvas, "AccentBot",
+            { R=0.06, G=0.35, B=0.6, A=0.5 },
+            L, B-0.003, R, B)
 
-    makeRect(root, canvas, "AccentLeft",
-        { R=0.06, G=0.35, B=0.6, A=0.3 },
-        L, T, L+0.002, B)
+        makeRect(root, canvas, "AccentLeft",
+            { R=0.06, G=0.35, B=0.6, A=0.3 },
+            L, T, L+0.002, B)
 
-    makeRect(root, canvas, "AccentRight",
-        { R=0.06, G=0.35, B=0.6, A=0.3 },
-        R-0.002, T, R, B)
+        makeRect(root, canvas, "AccentRight",
+            { R=0.06, G=0.35, B=0.6, A=0.3 },
+            R-0.002, T, R, B)
+    end
 
     -- Header separator
     makeRect(root, canvas, "SepHeader",
@@ -492,6 +499,11 @@ function ui.open(groups, closeCb, onPull)
     if not initClasses() then
         print("[DBTerminal] Failed to init widget classes\n")
         return
+    end
+
+    -- Load custom textures from PNG files (first call caches them)
+    if not textures.isLoaded() then
+        pcall(function() textures.loadAll() end)
     end
 
     registerButtonHook()
