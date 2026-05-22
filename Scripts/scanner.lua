@@ -99,6 +99,11 @@ function scanner.scan(terminalPos, radiusMeters)
                                 local label = nil
                                 pcall(function() label = source.labelFn(actor) end)
                                 if not label then label = source.class end
+
+                                -- Get actual actor class for icon differentiation
+                                local actorClass = source.class
+                                pcall(function() actorClass = actor:GetClass():GetFName():ToString() end)
+
                                 local invItems = inv:GetItems()
                                 if invItems then
                                     for _, item in ipairs(invItems) do
@@ -110,11 +115,11 @@ function scanner.scan(terminalPos, radiusMeters)
                                             typeName = typeName,
                                             itemId = s.ItemId,
                                             inventoryId = invId,
-                                            count = 1,  -- each entry = 1 item (Count field is unreliable)
+                                            count = 1,
                                             lockerLabel = label,
                                             lockerInv = inv,
                                             itemType = s.ItemType,
-                                            containerClass = source.class,
+                                            containerClass = actorClass,
                                         })
                                     end
                                 end

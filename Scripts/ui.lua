@@ -131,15 +131,22 @@ end
 -- Container type icons via UWEItemType Thumbnails (auto-loading TSoftObjectPtr)
 ----------------------------------------------------------------------
 local CONTAINER_ITEM_TYPES = {
-    SN2Locker                           = "DA_WallLocker_ItemType",
+    -- Specific locker types (actual Blueprint class names from actor:GetClass())
+    BP_Locker_Floor_C                   = "DA_FloorLocker_ItemType",
+    BP_LifepodWallLocker_C              = "DA_WallLocker_ItemType",
+    -- Floating/portable lockers
     BP_FloatingLocker_Carryable_C       = "DA_FloatingLocker_Carryable_ItemType",
-    BP_Tailing_Chest_C                  = "DA_FloorLocker_ItemType",  -- closest match
+    -- Chargers
     BP_BasicBatteryTerminal_C           = "DA_BasicBatteryTerminal_ItemType",
     BP_PowerCellTerminal_C              = "DA_PowerCellTerminal_ItemType",
+    -- Other containers
+    BP_Tailing_Chest_C                  = "DA_FloorLocker_ItemType",
     SN2Bioreactor                       = "DA_Bioreactor_ItemType",
     SN2ProcessorStation                 = "DA_Processor_ItemType",
     SN2BoxOfHolding                     = "DA_StorageCache_ItemType",
-    BP_PlayerDied_Blackbox_Proto_C      = "DA_FloorLocker_ItemType",  -- fallback
+    BP_PlayerDied_Blackbox_Proto_C      = "DA_FloorLocker_ItemType",
+    -- Fallback for any SN2Locker subclass not listed above
+    SN2Locker                           = "DA_WallLocker_ItemType",
 }
 
 local containerItemTypeCache = {}
