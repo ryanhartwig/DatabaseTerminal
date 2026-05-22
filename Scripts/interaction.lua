@@ -21,15 +21,14 @@ local function hideCTIWidget()
     for _, widget in ipairs(widgets) do
         if widget:IsValid() then
             pcall(function()
-                if widget:IsActivated() then
-                    -- SetVisibility(Hidden) = 1, Collapsed = 2
-                    widget:SetVisibility(1)
-                    print("[DBTerminal] Hid NoA widget\n")
-                end
+                -- SetVisibility: 0=Visible, 1=Hidden, 2=Collapsed
+                widget:SetVisibility(1)
+                print("[DBTerminal] Hid NoA widget\n")
             end)
         end
     end
 end
+
 
 function interaction.isOpen()
     return isOpen
@@ -44,6 +43,25 @@ function interaction.close()
     if ui then ui.close() end
     isOpen = false
     currentTerminal = nil
+
+    -- Restore CTI widget visibility and deactivate it properly
+    local widgets = FindAllOf("WBP_ComputerTextInterface_C")
+    if widgets then
+        for _, widget in ipairs(widgets) do
+            if widget:IsValid() then
+                pcall(function() widget:SetVisibility(0) end)
+                pcall(function() widget:DeactivateWidget() end)
+            end
+        end
+    end
+
+    -- Restore game input
+    local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+    local pc = UEHelpers:GetPlayerController()
+    if pc and wbLib then
+        pcall(function() wbLib:SetInputMode_GameOnly(pc, true) end)
+    end
+
     print("[DBTerminal] UI closed.\n")
 end
 
@@ -123,9 +141,10 @@ function interaction.init(deps)
         if not isOurs then return end
 
         print("[DBTerminal] Terminal interaction detected\n")
+
         ExecuteInGameThread(function()
-            -- Let the NoA widget open, then hide it and open ours
-            ExecuteWithDelay(100, function()
+            -- Let the NoA widget fully activate (sets up cursor/input), then hide it
+            ExecuteWithDelay(80, function()
                 ExecuteInGameThread(function()
                     hideCTIWidget()
                     open(actor)
@@ -165,12 +184,32 @@ function interaction.init(deps)
         return false
     end)
 
-    -- ESC to close
+    -- ESC to close (may not fire during UI mode)
     RegisterKeyBind(Key.ESCAPE, function()
         if not isOpen then return end
         ExecuteInGameThread(function()
             interaction.close()
         end)
+    end)
+
+    -- Backup close key (F6) in case ESC doesn't fire
+    RegisterKeyBind(Key.F6, function()
+        if not isOpen then return end
+        ExecuteInGameThread(function()
+            interaction.close()
+        end)
+    end)
+
+    -- Also hook the NoA widget's own back/close buttons
+    RegisterCustomEvent("BP_OnDeactivated", function(self, ...)
+        if not isOpen then return end
+        local widget = self:get()
+        local cls = widget:GetClass():GetFName():ToString()
+        if cls == "WBP_ComputerTextInterface_C" then
+            ExecuteInGameThread(function()
+                interaction.close()
+            end)
+        end
     end)
 end
 
