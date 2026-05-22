@@ -240,22 +240,21 @@ local function buildBackground(root, canvas)
         makeRect(root, canvas, "AccentRight",
             { R=0.06, G=0.35, B=0.6, A=0.3 },
             R-0.002, T, R, B)
+        -- Header separator
+        makeRect(root, canvas, "SepHeader",
+            { R=0.08, G=0.4, B=0.65, A=0.45 },
+            L+PANEL.CONTENT_PAD, T+PANEL.HEADER_H, R-PANEL.CONTENT_PAD, T+PANEL.HEADER_H+0.003)
+
+        -- Content area inner border
+        makeRect(root, canvas, "InnerBorder",
+            { R=0.03, G=0.08, B=0.15, A=0.3 },
+            L+0.015, T+PANEL.HEADER_H+0.01, R-0.015, B-0.015)
+
+        -- Footer separator
+        makeRect(root, canvas, "FooterSep",
+            { R=0.08, G=0.4, B=0.65, A=0.25 },
+            L+PANEL.CONTENT_PAD, B-0.045, R-PANEL.CONTENT_PAD, B-0.042)
     end
-
-    -- Header separator
-    makeRect(root, canvas, "SepHeader",
-        { R=0.08, G=0.4, B=0.65, A=0.45 },
-        L+PANEL.CONTENT_PAD, T+PANEL.HEADER_H, R-PANEL.CONTENT_PAD, T+PANEL.HEADER_H+0.003)
-
-    -- Content area inner border
-    makeRect(root, canvas, "InnerBorder",
-        { R=0.03, G=0.08, B=0.15, A=0.3 },
-        L+0.015, T+PANEL.HEADER_H+0.01, R-0.015, B-0.015)
-
-    -- Footer separator
-    makeRect(root, canvas, "FooterSep",
-        { R=0.08, G=0.4, B=0.65, A=0.25 },
-        L+PANEL.CONTENT_PAD, B-0.045, R-PANEL.CONTENT_PAD, B-0.042)
 end
 
 ----------------------------------------------------------------------
