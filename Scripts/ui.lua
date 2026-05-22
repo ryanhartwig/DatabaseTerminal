@@ -413,13 +413,20 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             if containerType then
                 pcall(function()
                     containerIcon:SetBrushFromSoftTexture(containerType.Thumbnail, false)
-                    containerIcon:SetDesiredSizeOverride({ X = 20, Y = 20 })
                 end)
             end
             local cIconSize = makeSizeBox(root, 20, 20)
-            pcall(function() cIconSize:SetMaxDesiredHeight(20) end)
+            pcall(function()
+                cIconSize:SetMinDesiredWidth(20)
+                cIconSize:SetMinDesiredHeight(20)
+                cIconSize:SetMaxDesiredWidth(20)
+                cIconSize:SetMaxDesiredHeight(20)
+            end)
             cIconSize:SetContent(containerIcon)
-            subRow:AddChildToHorizontalBox(cIconSize)
+            local cIconSlot = subRow:AddChildToHorizontalBox(cIconSize)
+            pcall(function()
+                cIconSlot:SetVerticalAlignment(1)  -- 1 = Center
+            end)
 
             -- Small gap after icon
             local iconGap = makeSizeBox(root, 6, 1)
