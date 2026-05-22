@@ -19,4 +19,5 @@ interaction.init({
     config = config,
 })
 
+require("dbg")  -- visual experimentation
 print("[DBTerminal] Ready.\n")
