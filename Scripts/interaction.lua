@@ -29,11 +29,12 @@ function interaction.close()
     isOpen = false
     currentTerminal = nil
 
-    -- Restore game input (we manage it via SetInputMode_UIOnlyEx on open)
+    -- Restore game input and hide cursor
     local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
     local pc = UEHelpers:GetPlayerController()
     if pc and wbLib then
         pcall(function() wbLib:SetInputMode_GameOnly(pc, true) end)
+        pcall(function() pc.bShowMouseCursor = false end)
     end
 
     print("[DBTerminal] UI closed.\n")
@@ -111,12 +112,17 @@ function interaction.init(deps)
 
         -- Suppress the NoA widget BEFORE it opens by calling CloseUI
         -- on the CTI component. This prevents the widget push entirely.
-        pcall(function()
+        -- Wrapped in pcall — if the component is in a bad state, we skip
+        -- suppression and our UI still opens (NoA may flash briefly).
+        local suppressOk = pcall(function()
             local comp = actor.BPC_ComputerTextInterface_Component
             if comp and comp:IsValid() then
                 comp:CloseUI()
             end
         end)
+        if not suppressOk then
+            print("[DBTerminal] CloseUI failed — NoA popup may flash\n")
+        end
 
         ExecuteInGameThread(function()
             -- Open our UI directly — no loading screen needed
@@ -124,11 +130,12 @@ function interaction.init(deps)
                 ExecuteInGameThread(function()
                     pcall(function()
                         open(actor)
-                        -- Set up our own input mode since NoA widget isn't managing it
+                        -- Set up input mode and show cursor
                         local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
                         local pc = UEHelpers:GetPlayerController()
                         if pc and wbLib and ui.getRoot() then
                             wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true)
+                            pc.bShowMouseCursor = true
                         end
                     end)
                 end)
