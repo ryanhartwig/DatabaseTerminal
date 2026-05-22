@@ -376,7 +376,7 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         pcall(function()
             icon:SetBrushFromSoftTexture(group.itemType.Thumbnail, true)
         end)
-        local iconSize = makeSizeBox(root, 32, 32)
+        local iconSize = makeSizeBox(root, 48, 48)
         iconSize:SetContent(icon)
         itemHeader:AddChildToHorizontalBox(iconSize)
 
@@ -417,8 +417,8 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
                 end)
             end
             local cIconSize = StaticConstructObject(classes.sizeBox, root, newName("CISize"))
-            pcall(function() cIconSize:SetWidthOverride(28) end)
-            pcall(function() cIconSize:SetHeightOverride(28) end)
+            pcall(function() cIconSize:SetWidthOverride(36) end)
+            -- Note: SetHeightOverride has no effect in HBox — height is set by row
             pcall(function() cIconSize:SetContent(containerIcon) end)
             subRow:AddChildToHorizontalBox(cIconSize)
 
