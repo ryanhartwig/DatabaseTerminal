@@ -101,12 +101,13 @@ function interaction.init(deps)
 
     -- Hook InteractClient
     RegisterCustomEvent("InteractClient", function(self, ...)
-        local actor = self:get()
-        local className = actor:GetClass():GetFName():ToString()
-        if className ~= ACTOR_CLASS then return end
+        local ok, actor = pcall(function() return self:get() end)
+        if not ok or not actor then return end
+        local classOk, className = pcall(function() return actor:GetClass():GetFName():ToString() end)
+        if not classOk or className ~= ACTOR_CLASS then return end
 
-        local fname = actor:GetFName():ToString()
-        if not tracker.isTerminal(fname) then return end
+        local fnameOk, fname = pcall(function() return actor:GetFName():ToString() end)
+        if not fnameOk or not tracker.isTerminal(fname) then return end
 
         print("[DBTerminal] Terminal interaction detected\n")
 
@@ -159,14 +160,17 @@ function interaction.init(deps)
     local hoveringOurTerminal = false
 
     RegisterCustomEvent("GetInteractionInfo", function(self, ...)
-        local actor = self:get()
-        local cls = actor:GetClass():GetFName():ToString()
-        if cls ~= ACTOR_CLASS then
-            hoveringOurTerminal = false
-            return
-        end
-        local fname = actor:GetFName():ToString()
-        hoveringOurTerminal = tracker.isTerminal(fname)
+        local ok = pcall(function()
+            local actor = self:get()
+            local cls = actor:GetClass():GetFName():ToString()
+            if cls ~= ACTOR_CLASS then
+                hoveringOurTerminal = false
+                return
+            end
+            local fname = actor:GetFName():ToString()
+            hoveringOurTerminal = tracker.isTerminal(fname)
+        end)
+        if not ok then hoveringOurTerminal = false end
     end)
 
     LoopAsync(100, function()
