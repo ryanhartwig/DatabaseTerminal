@@ -145,11 +145,19 @@ local CONTAINER_ICON_PATHS = {
 local containerIconCache = {}
 
 local function getContainerIcon(containerClass)
-    if containerIconCache[containerClass] then return containerIconCache[containerClass] end
+    if containerIconCache[containerClass] ~= nil then return containerIconCache[containerClass] end
     local path = CONTAINER_ICON_PATHS[containerClass]
-    if not path then return nil end
+    if not path then
+        containerIconCache[containerClass] = false
+        return nil
+    end
+    -- Try StaticFindObject first
     local tex = StaticFindObject(path)
-    if tex then containerIconCache[containerClass] = tex end
+    -- If not found, try LoadAsset to force-load the texture
+    if not tex then
+        pcall(function() tex = LoadAsset(path) end)
+    end
+    containerIconCache[containerClass] = tex or false
     return tex
 end
 
@@ -348,10 +356,9 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         local icon = makeImage(root)
         pcall(function()
             icon:SetBrushFromSoftTexture(group.itemType.Thumbnail, true)
+            icon:SetDesiredSizeOverride({ X = 28, Y = 28 })
         end)
-        local iconSize = makeSizeBox(root, 28, 28)
-        iconSize:SetContent(icon)
-        itemHeader:AddChildToHorizontalBox(iconSize)
+        itemHeader:AddChildToHorizontalBox(icon)
 
         -- Small gap between icon and name
         local iconGap = makeSizeBox(root, 8, 1)
@@ -384,11 +391,12 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             local containerIcon = makeImage(root)
             local tex = getContainerIcon(container.containerClass)
             if tex then
-                pcall(function() containerIcon:SetBrushFromTexture(tex, true) end)
+                pcall(function()
+                    containerIcon:SetBrushFromTexture(tex, true)
+                    containerIcon:SetDesiredSizeOverride({ X = 18, Y = 18 })
+                end)
             end
-            local iconBox = makeSizeBox(root, 18, 18)
-            iconBox:SetContent(containerIcon)
-            subRow:AddChildToHorizontalBox(iconBox)
+            subRow:AddChildToHorizontalBox(containerIcon)
 
             -- Small gap after icon
             local iconGap = makeSizeBox(root, 6, 1)

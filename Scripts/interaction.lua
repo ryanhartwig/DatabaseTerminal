@@ -136,6 +136,17 @@ function interaction.init(deps)
                         if pc and wbLib and ui.getRoot() then
                             wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true)
                             pc.bShowMouseCursor = true
+                            -- Center cursor on screen
+                            pcall(function()
+                                local vpSize = { X = 0, Y = 0 }
+                                pcall(function()
+                                    local vp = pc:GetLocalPlayer():GetViewportClient()
+                                    vp:GetViewportSize(vpSize)
+                                end)
+                                if vpSize.X > 0 then
+                                    pc:SetMouseLocation(vpSize.X / 2, vpSize.Y / 2)
+                                end
+                            end)
                         end
                     end)
                 end)
