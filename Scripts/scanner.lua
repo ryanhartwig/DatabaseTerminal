@@ -41,14 +41,28 @@ function scanner.scan(terminalPos, radiusMeters)
     local radiusUnits = radiusMeters * 100  -- UE uses centimeters
 
     local containerSources = {
-        { class = "SN2Locker",                  getInv = function(a) return a.Inventory end,            labelFn = getLockerLabel },
-        { class = "BP_Tailing_Chest_C",         getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Tailing Chest" end },
-        { class = "BP_BasicBatteryTerminal_C",   getInv = function(a) return a.InventoryComponent end,  labelFn = function() return "Battery Charger" end },
-        { class = "BP_PowerCellTerminal_C",      getInv = function(a) return a.InventoryComponent end,  labelFn = function() return "Power Cell Charger" end },
+        { class = "SN2Locker",                       getInv = function(a) return a.Inventory end,            labelFn = getLockerLabel },
+        { class = "BP_Tailing_Chest_C",              getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Tailing Chest" end },
+        { class = "BP_BasicBatteryTerminal_C",       getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Battery Charger" end },
+        { class = "BP_PowerCellTerminal_C",          getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Power Cell Charger" end },
+        { class = "SN2BoxOfHolding",                 getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Storage Cache" end },
+        { class = "BP_PlayerDied_Blackbox_Proto_C",  getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Blackbox" end },
     }
 
     local items = {}
     local containerCount = 0
+
+    -- Get player inventory ID so we can skip it
+    local playerInvId = nil
+    pcall(function()
+        local pawn = UEHelpers:GetPlayerController().Pawn
+        if pawn and pawn:IsValid() then
+            playerInvId = pawn.InventoryComponent.InventoryId
+        end
+    end)
+
+    -- Track scanned inventory IDs to prevent double-counting
+    local scannedInventories = {}
 
     for _, source in ipairs(containerSources) do
         local actors = FindAllOf(source.class)
@@ -59,14 +73,20 @@ function scanner.scan(terminalPos, radiusMeters)
                     if dist <= radiusUnits then
                         local invOk, inv = pcall(function() return source.getInv(actor) end)
                         if invOk and inv and inv:IsValid() then
+                            local invId = inv.InventoryId
+
+                            -- Skip player inventories
+                            if invId == playerInvId then goto nextActor end
+                            -- Skip already-scanned inventories (dedup)
+                            if scannedInventories[invId] then goto nextActor end
+                            scannedInventories[invId] = true
+
                             local isEmpty = inv:IsEmpty()
                             if not isEmpty then
                                 containerCount = containerCount + 1
                                 local label = nil
                                 pcall(function() label = source.labelFn(actor) end)
                                 if not label then label = source.class end
-
-                                local invId = inv.InventoryId
                                 local invItems = inv:GetItems()
                                 if invItems then
                                     for _, item in ipairs(invItems) do
@@ -82,6 +102,7 @@ function scanner.scan(terminalPos, radiusMeters)
                                             lockerLabel = label,
                                             lockerInv = inv,
                                             itemType = s.ItemType,
+                                            containerClass = source.class,
                                         })
                                     end
                                 end
@@ -89,6 +110,7 @@ function scanner.scan(terminalPos, radiusMeters)
                         end
                     end
                 end
+                ::nextActor::
             end
         end
     end
@@ -124,6 +146,7 @@ function scanner.group(items)
                 count = 0,
                 inventoryId = item.inventoryId,
                 lockerInv = item.lockerInv,
+                containerClass = item.containerClass,
                 items = {},
             }
         end
