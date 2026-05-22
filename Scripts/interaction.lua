@@ -2,6 +2,7 @@
 -- Hooks InteractClient, manages UI open/close lifecycle
 
 local UEHelpers = require("UEHelpers")
+local textures = require("textures")
 local interaction = {}
 
 local ACTOR_CLASS = "BP_ComputerTextInterface_Terminal_PlayerBuilt_C"
@@ -13,8 +14,62 @@ local config = nil
 
 local isOpen = false
 local currentTerminal = nil
+local loadingWidget = nil
+local interactionGen = 0  -- generation counter — stale callbacks bail out
 
+----------------------------------------------------------------------
+-- Loading screen
+----------------------------------------------------------------------
+local function showLoadingScreen()
+    if loadingWidget then
+        pcall(function() loadingWidget:RemoveFromViewport() end)
+        loadingWidget = nil
+    end
 
+    -- Always reimport textures fresh — UE GC can free unrooted UTexture2Ds
+    -- between interactions, and touching a freed pointer = segfault
+    pcall(function() textures.loadAll() end)
+    local loadingTex = textures.get("Loading")
+    if not loadingTex then return false end
+
+    local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+    local uwClass = StaticFindObject("/Script/UMG.UserWidget")
+    local canvasCls = StaticFindObject("/Script/UMG.CanvasPanel")
+    local imgCls = StaticFindObject("/Script/UMG.Image")
+    local pc = UEHelpers:GetPlayerController()
+    if not pc or not wbLib then return end
+
+    local root = wbLib:Create(pc, uwClass, pc)
+    if not root then return end
+
+    local canvas = StaticConstructObject(canvasCls, root, FName("LoadCanvas"))
+    root.WidgetTree.RootWidget = canvas
+
+    -- Loading image — same bounds as the main UI panel
+    local img = StaticConstructObject(imgCls, root, FName("LoadImg"))
+    pcall(function() img:SetBrushFromTexture(loadingTex, false) end)
+    local slot = canvas:AddChildToCanvas(img)
+    slot:SetAnchors({ Minimum = { X = 0.10, Y = 0.05 }, Maximum = { X = 0.90, Y = 0.95 } })
+    slot:SetAutoSize(false)
+
+    root:AddToViewport(501)  -- above main UI z-order (500)
+    loadingWidget = root
+
+    -- Lock input so player can't move during load
+    pcall(function() wbLib:SetInputMode_UIOnlyEx(pc, root, 0, true) end)
+    pcall(function() pc.bShowMouseCursor = false end)
+end
+
+local function hideLoadingScreen()
+    if loadingWidget then
+        pcall(function() loadingWidget:RemoveFromViewport() end)
+        loadingWidget = nil
+    end
+end
+
+----------------------------------------------------------------------
+-- Public API
+----------------------------------------------------------------------
 function interaction.isOpen()
     return isOpen
 end
@@ -25,6 +80,8 @@ end
 
 function interaction.close()
     if not isOpen then return end
+    interactionGen = interactionGen + 1  -- invalidate any pending delayed callback
+    hideLoadingScreen()
     if ui then ui.close() end
     isOpen = false
     currentTerminal = nil
@@ -125,11 +182,34 @@ function interaction.init(deps)
             print("[DBTerminal] CloseUI failed — NoA popup may flash\n")
         end
 
+        -- Mark open immediately so ESC/F6 work during loading phase
+        isOpen = true
+        currentTerminal = actor
+        interactionGen = interactionGen + 1
+        local myGen = interactionGen
+
         ExecuteInGameThread(function()
-            -- Open our UI directly — no loading screen needed
-            ExecuteWithDelay(50, function()
+            if interactionGen ~= myGen then return end
+            -- Show loading screen instantly
+            pcall(function() showLoadingScreen() end)
+
+            -- After delay, transition to the main UI
+            ExecuteWithDelay(1200, function()
                 ExecuteInGameThread(function()
+                    -- Bail if this interaction was cancelled (user hit ESC/F6)
+                    if interactionGen ~= myGen then return end
+
                     pcall(function()
+                        -- Verify actor is still valid before using it
+                        if not actor or not actor:IsValid() then
+                            print("[DBTerminal] Actor no longer valid — aborting\n")
+                            interaction.close()
+                            return
+                        end
+
+                        hideLoadingScreen()
+                        -- Reset isOpen so open() doesn't double-close
+                        isOpen = false
                         open(actor)
                         -- Set up input mode and show cursor
                         local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
@@ -192,15 +272,9 @@ function interaction.init(deps)
         return false
     end)
 
-    -- ESC to close (may not fire during UI mode)
-    RegisterKeyBind(Key.ESCAPE, function()
-        if not isOpen then return end
-        ExecuteInGameThread(function()
-            interaction.close()
-        end)
-    end)
-
-    -- Backup close key (F6) in case ESC doesn't fire
+    -- Close via F6 — ESC can't be used because RegisterKeyBind doesn't
+    -- consume input, so the game also processes it (opens settings menu).
+    -- The UI has a close button [X] for mouse users.
     RegisterKeyBind(Key.F6, function()
         if not isOpen then return end
         ExecuteInGameThread(function()

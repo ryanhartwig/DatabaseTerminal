@@ -260,8 +260,8 @@ end
 ----------------------------------------------------------------------
 -- Header bar
 ----------------------------------------------------------------------
-local function buildHeader(root, canvas, groups)
-    local L, T = PANEL.L, PANEL.T
+local function buildHeader(root, canvas, groups, closeCb)
+    local L, R, T = PANEL.L, PANEL.R, PANEL.T
 
     -- Title
     local title = makeText(root, "DATABASE TERMINAL")
@@ -280,8 +280,16 @@ local function buildHeader(root, canvas, groups)
     local statsStr = string.format("%d items | %d containers", totalItems, totalContainers)
     statsWidget = makeText(root, statsStr)
     local statsSlot = canvas:AddChildToCanvas(statsWidget)
-    statsSlot:SetAnchors({ Minimum = { X = PANEL.R-0.22, Y = T+0.018 }, Maximum = { X = PANEL.R-0.22, Y = T+0.018 } })
+    statsSlot:SetAnchors({ Minimum = { X = R-0.22, Y = T+0.018 }, Maximum = { X = R-0.22, Y = T+0.018 } })
     statsSlot:SetAutoSize(true)
+
+    -- Close button [X]
+    local closeBtn = makeButton(root, "X", function()
+        if closeCb then closeCb() end
+    end)
+    local closeBtnSlot = canvas:AddChildToCanvas(closeBtn)
+    closeBtnSlot:SetAnchors({ Minimum = { X = R-0.04, Y = T+0.012 }, Maximum = { X = R-0.04, Y = T+0.012 } })
+    closeBtnSlot:SetAutoSize(true)
 
     -- Footer version
     local ver = makeText(root, "Database Terminal v0.1.0")
@@ -500,10 +508,8 @@ function ui.open(groups, closeCb, onPull)
         return
     end
 
-    -- Load custom textures from PNG files (first call caches them)
-    if not textures.isLoaded() then
-        pcall(function() textures.loadAll() end)
-    end
+    -- Textures are reimported fresh by interaction.lua before each open
+    -- (UE GC can free unrooted UTexture2Ds between interactions)
 
     registerButtonHook()
 
@@ -526,7 +532,7 @@ function ui.open(groups, closeCb, onPull)
 
     -- Build layers
     buildBackground(root, canvas)
-    buildHeader(root, canvas, groups)
+    buildHeader(root, canvas, groups, closeCb)
 
     -- Search box
     local searchBox = StaticConstructObject(classes.editText, root, FName("SearchBox"))

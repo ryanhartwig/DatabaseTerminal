@@ -19,8 +19,12 @@ local TEXTURE_FILES = {
     Loading    = "T_DBTerminal_Loading.png",
 }
 
---- Load all textures from disk. Call once after world is loaded.
+--- Import all textures fresh from disk.
+--- Always clears cache first — never touches old UObject pointers
+--- (UE GC can free unrooted UTexture2Ds, making old pointers dangling).
 function textures.loadAll()
+    cache = {}  -- drop all old refs without touching them
+
     if not krl then
         krl = StaticFindObject("/Script/Engine.Default__KismetRenderingLibrary")
     end
@@ -33,14 +37,12 @@ function textures.loadAll()
     if not pc then return end
 
     for name, filename in pairs(TEXTURE_FILES) do
-        if not cache[name] then
-            local filepath = TEXTURE_DIR .. filename
-            local ok, tex = pcall(function()
-                return krl:ImportFileAsTexture2D(pc, filepath)
-            end)
-            if ok and tex then
-                cache[name] = tex
-            end
+        local filepath = TEXTURE_DIR .. filename
+        local ok, tex = pcall(function()
+            return krl:ImportFileAsTexture2D(pc, filepath)
+        end)
+        if ok and tex then
+            cache[name] = tex
         end
     end
 
