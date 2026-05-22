@@ -128,6 +128,32 @@ local function makeButton(root, text, onClick)
 end
 
 ----------------------------------------------------------------------
+-- Container type icon paths (from game's IconBaker textures)
+----------------------------------------------------------------------
+local CONTAINER_ICON_PATHS = {
+    SN2Locker                           = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Wall_A_Icon.T_Locker_Wall_A_Icon",
+    BP_FloatingLocker_Carryable_C       = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
+    BP_Tailing_Chest_C                  = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
+    BP_BasicBatteryTerminal_C           = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_Misc/T_AdvancedBattery_Icon.T_AdvancedBattery_Icon",
+    BP_PowerCellTerminal_C              = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_Misc/T_PowerCellStandard_Icon.T_PowerCellStandard_Icon",
+    SN2Bioreactor                       = "/Game/UI/Beacons/Icons_new/T_Icon_PlantPing.T_Icon_PlantPing",
+    SN2ProcessorStation                 = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Processor_Icon.T_Processor_Icon",
+    SN2BoxOfHolding                     = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
+    BP_PlayerDied_Blackbox_Proto_C      = "/Game/Utility/Editor/IconBaker/IconTextures/IconBaker_BasePieces/T_Locker_Floor_A_Icon.T_Locker_Floor_A_Icon",
+}
+
+local containerIconCache = {}
+
+local function getContainerIcon(containerClass)
+    if containerIconCache[containerClass] then return containerIconCache[containerClass] end
+    local path = CONTAINER_ICON_PATHS[containerClass]
+    if not path then return nil end
+    local tex = StaticFindObject(path)
+    if tex then containerIconCache[containerClass] = tex end
+    return tex
+end
+
+----------------------------------------------------------------------
 -- Panel layout constants
 ----------------------------------------------------------------------
 local PANEL = {
@@ -350,9 +376,23 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         for _, container in ipairs(group.containerList) do
             local subRow = makeHBox(root)
 
-            -- Indentation via fixed-width SizeBox instead of spaces
-            local indent = makeSizeBox(root, 36, 1)
+            -- Indentation
+            local indent = makeSizeBox(root, 28, 1)
             subRow:AddChildToHorizontalBox(indent)
+
+            -- Container type icon
+            local containerIcon = makeImage(root)
+            local tex = getContainerIcon(container.containerClass)
+            if tex then
+                pcall(function() containerIcon:SetBrushFromTexture(tex, true) end)
+            end
+            local iconBox = makeSizeBox(root, 18, 18)
+            iconBox:SetContent(containerIcon)
+            subRow:AddChildToHorizontalBox(iconBox)
+
+            -- Small gap after icon
+            local iconGap = makeSizeBox(root, 6, 1)
+            subRow:AddChildToHorizontalBox(iconGap)
 
             local labelText = makeText(root, container.label)
             subRow:AddChildToHorizontalBox(labelText)
