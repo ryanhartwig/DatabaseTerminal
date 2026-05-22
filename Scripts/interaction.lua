@@ -190,14 +190,14 @@ function interaction.init(deps)
 
         ExecuteInGameThread(function()
             -- Loading screen immediately masks the NoA widget
-            showLoadingScreen()
+            pcall(showLoadingScreen)
 
             -- Let NoA widget activate (sets up cursor/input), then hide + open ours
             ExecuteWithDelay(80, function()
                 ExecuteInGameThread(function()
-                    hideCTIWidget()
-                    removeLoadingScreen()
-                    open(actor)
+                    pcall(hideCTIWidget)
+                    pcall(removeLoadingScreen)
+                    pcall(function() open(actor) end)
                 end)
             end)
         end)

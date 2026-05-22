@@ -75,27 +75,31 @@ function tracker.init()
                     end
                 end
 
-                -- Poll for new BioBed
+                -- Poll for new terminal
                 local attempts = 0
                 LoopAsync(500, function()
                     attempts = attempts + 1
                     if attempts > 20 then return true end
 
-                    local currentBeds = FindAllOf(ACTOR_CLASS)
-                    if currentBeds then
-                        for _, bed in ipairs(currentBeds) do
-                            local fname = bed:GetFName():ToString()
-                            if not existing[fname] and not terminalActors[fname] then
-                                local loc = bed:K2_GetActorLocation()
-                                terminalActors[fname] = { pos = { X = loc.X, Y = loc.Y, Z = loc.Z } }
-                                state.save(terminalActors)
-                                visuals.apply(bed)
-                                print("[DBTerminal] Tagged terminal: " .. fname .. "\n")
-                                return true
+                    local ok, found = pcall(function()
+                        local currentBeds = FindAllOf(ACTOR_CLASS)
+                        if currentBeds then
+                            for _, bed in ipairs(currentBeds) do
+                                local fname = bed:GetFName():ToString()
+                                if not existing[fname] and not terminalActors[fname] then
+                                    local loc = bed:K2_GetActorLocation()
+                                    terminalActors[fname] = { pos = { X = loc.X, Y = loc.Y, Z = loc.Z } }
+                                    state.save(terminalActors)
+                                    visuals.apply(bed)
+                                    print("[DBTerminal] Tagged terminal: " .. fname .. "\n")
+                                    return true
+                                end
                             end
                         end
-                    end
-                    return false
+                        return false
+                    end)
+                    if not ok then return true end  -- error = stop
+                    return found
                 end)
             end)
         end)
@@ -103,13 +107,17 @@ function tracker.init()
 
     -- Load state on mod reload (immediate, with delay for world to be ready)
     ExecuteWithDelay(2000, function()
-        ExecuteInGameThread(tracker.loadState)
+        ExecuteInGameThread(function()
+            pcall(tracker.loadState)
+        end)
     end)
 
     -- Load state on fresh game start (OnPossessedPawn fires when player spawns)
     RegisterHook("/Script/Subnautica2.SN2PlayerController:OnPossessedPawnChangedFunction", function()
         ExecuteWithDelay(3000, function()
-            ExecuteInGameThread(tracker.loadState)
+            ExecuteInGameThread(function()
+                pcall(tracker.loadState)
+            end)
         end)
     end)
 end
