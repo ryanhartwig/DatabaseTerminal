@@ -2,6 +2,7 @@
 -- Tracks which BioBeds are our Database Terminals via builder menu hooks
 
 local state = require("state")
+local visuals = require("visuals")
 local tracker = {}
 
 local BUILD_ACTION_NAME = "DA_AxumTrashcanData"
@@ -20,6 +21,8 @@ end
 
 --- Load saved state from disk
 function tracker.loadState()
+    visuals.clearCache()
+    terminalActors = {}  -- clear stale entries from previous world
     local loaded = state.load()
     local count = 0
     for k, v in pairs(loaded) do
@@ -28,6 +31,19 @@ function tracker.loadState()
     end
     if count > 0 then
         print(string.format("[DBTerminal] Restored %d terminal(s) from save\n", count))
+        -- Apply visuals with retries — rendering may reset materials on loaded actors
+        local retries = 0
+        LoopAsync(3000, function()
+            retries = retries + 1
+            if retries > 3 then return true end
+            ExecuteInGameThread(function()
+                visuals.applyAll(terminalActors)
+                print(string.format("[DBTerminal] Applied visuals (attempt %d/3)\n", retries))
+            end)
+            return false
+        end)
+    else
+        print("[DBTerminal] No terminals found in save (or actors not loaded yet)\n")
     end
 end
 
@@ -78,6 +94,7 @@ function tracker.init()
                                 local loc = bed:K2_GetActorLocation()
                                 terminalActors[fname] = { pos = { X = loc.X, Y = loc.Y, Z = loc.Z } }
                                 state.save(terminalActors)
+                                visuals.apply(bed)
                                 print("[DBTerminal] Tagged terminal: " .. fname .. "\n")
                                 return true
                             end
@@ -89,13 +106,14 @@ function tracker.init()
         end)
     end)
 
-    -- Load state immediately (covers mod reload) and on world load (covers fresh start)
-    ExecuteWithDelay(1000, function()
+    -- Load state on mod reload (immediate, with delay for world to be ready)
+    ExecuteWithDelay(2000, function()
         ExecuteInGameThread(tracker.loadState)
     end)
 
+    -- Load state on fresh game start (OnPossessedPawn fires when player spawns)
     RegisterHook("/Script/Subnautica2.SN2PlayerController:OnPossessedPawnChangedFunction", function()
-        ExecuteWithDelay(2000, function()
+        ExecuteWithDelay(3000, function()
             ExecuteInGameThread(tracker.loadState)
         end)
     end)

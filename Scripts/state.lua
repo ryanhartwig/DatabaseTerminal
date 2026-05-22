@@ -45,10 +45,15 @@ function state.load()
     end
 
     if #savedPositions == 0 then return terminalActors end
+    print(string.format("[DBTerminal] State file has %d saved position(s)\n", #savedPositions))
 
-    -- Find BioBeds and match by position
+    -- Find terminals and match by position
     local beds = FindAllOf("BP_ComputerTextInterface_Terminal_PlayerBuilt_C")
-    if not beds then return terminalActors end
+    if not beds then
+        print("[DBTerminal] FindAllOf returned nil — actors not loaded yet\n")
+        return terminalActors
+    end
+    print(string.format("[DBTerminal] Found %d CTI terminals in world\n", #beds))
 
     for _, bed in ipairs(beds) do
         if bed:IsValid() then

@@ -80,7 +80,16 @@ function interaction.init(deps)
         if className ~= ACTOR_CLASS then return end
 
         local fname = actor:GetFName():ToString()
-        if not tracker.isTerminal(fname) then return end
+        local isOurs = tracker.isTerminal(fname)
+        print(string.format("[DBTerminal] InteractClient: %s | isTerminal=%s\n", fname, tostring(isOurs)))
+
+        -- Debug: print all tracked terminals
+        local tracked = tracker.getTerminals()
+        for k, _ in pairs(tracked) do
+            print("[DBTerminal]   tracked: " .. k .. "\n")
+        end
+
+        if not isOurs then return end
 
         print("[DBTerminal] Terminal interaction detected\n")
         ExecuteInGameThread(function()
