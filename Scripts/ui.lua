@@ -20,6 +20,7 @@ local function initClasses()
     classes.scroll   = StaticFindObject("/Script/UMG.ScrollBox")
     classes.img      = StaticFindObject("/Script/UMG.Image")
     classes.sizeBox  = StaticFindObject("/Script/UMG.SizeBox")
+    classes.editText = StaticFindObject("/Script/UMG.EditableTextBox")
     return classes.wbLib ~= nil
 end
 
@@ -348,7 +349,7 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
     groupWidgets = {}
 
     -- Position scrollbox
-    local contentTop = PANEL.T + PANEL.HEADER_H + 0.015
+    local contentTop = PANEL.T + PANEL.HEADER_H + 0.045  -- extra space for search box
     local contentBot = PANEL.B - 0.05
     local scrollSlot = canvas:AddChildToCanvas(scrollBox)
     scrollSlot:SetAnchors({
@@ -515,6 +516,39 @@ function ui.open(groups, closeCb, onPull)
     -- Build layers
     buildBackground(root, canvas)
     buildHeader(root, canvas, groups)
+
+    -- Search box
+    local searchBox = StaticConstructObject(classes.editText, root, FName("SearchBox"))
+    pcall(function() searchBox:SetText(FText("")) end)
+    local searchSlot = canvas:AddChildToCanvas(searchBox)
+    searchSlot:SetAnchors({
+        Minimum = { X = PANEL.L + PANEL.CONTENT_PAD + 0.01, Y = PANEL.T + PANEL.HEADER_H + 0.005 },
+        Maximum = { X = PANEL.R - PANEL.CONTENT_PAD - 0.01, Y = PANEL.T + PANEL.HEADER_H + 0.005 }
+    })
+    searchSlot:SetAutoSize(true)
+
+    -- Poll search text and filter groups
+    local lastSearchText = ""
+    LoopAsync(200, function()
+        if not root then return true end
+        local ok, searchText = pcall(function()
+            local ft = searchBox:GetText()
+            local resolveOk, str = pcall(function() return ft:ToString() end)
+            return resolveOk and str or ""
+        end)
+        if not ok then return true end
+        if searchText == lastSearchText then return false end
+        lastSearchText = searchText
+
+        local filter = searchText:lower()
+        for _, gw in ipairs(groupWidgets) do
+            local match = (filter == "") or gw.group.displayName:lower():find(filter, 1, true)
+            pcall(function()
+                gw.groupBox:SetVisibility(match and 0 or 1)
+            end)
+        end
+        return false
+    end)
 
     -- ScrollBox
     scrollBox = StaticConstructObject(classes.scroll, root, FName("ScrollArea"))
