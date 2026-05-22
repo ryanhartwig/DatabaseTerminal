@@ -412,17 +412,15 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             local containerType = getContainerItemType(container.containerClass, container.sourceClass)
             if containerType then
                 pcall(function()
-                    containerIcon:SetBrushFromSoftTexture(containerType.Thumbnail, true)
+                    containerIcon:SetBrushFromSoftTexture(containerType.Thumbnail, false)
+                    containerIcon:SetDesiredSizeOverride({ X = 28, Y = 28 })
                 end)
             end
-            -- Use same pattern as item header icons (SizeBox wrapper, true for match-size)
-            local cIconSize = makeSizeBox(root, 24, 24)
-            cIconSize:SetContent(containerIcon)
-            local cIconSlot = subRow:AddChildToHorizontalBox(cIconSize)
-            pcall(function()
-                cIconSlot:SetVerticalAlignment(1)  -- 1 = Center
-                cIconSlot:SetSize({ SizeRule = 0, Value = 0.0 })  -- Auto, don't fill
-            end)
+            local cIconSize = StaticConstructObject(classes.sizeBox, root, newName("CISize"))
+            pcall(function() cIconSize:SetWidthOverride(28) end)
+            pcall(function() cIconSize:SetHeightOverride(28) end)
+            pcall(function() cIconSize:SetContent(containerIcon) end)
+            subRow:AddChildToHorizontalBox(cIconSize)
 
             -- Small gap after icon
             local iconGap = makeSizeBox(root, 6, 1)
