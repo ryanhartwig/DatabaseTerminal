@@ -424,19 +424,21 @@ function ui.open(groups, closeCb, onPull)
     -- Poll: if NoA widget closes, close our UI too
     LoopAsync(200, function()
         if not root then return true end
-        local ctiWidgets = FindAllOf("WBP_ComputerTextInterface_C")
-        local anyActive = false
-        if ctiWidgets then
+        local ok, shouldClose = pcall(function()
+            local ctiWidgets = FindAllOf("WBP_ComputerTextInterface_C")
+            if not ctiWidgets then return true end
             for _, w in ipairs(ctiWidgets) do
                 if w:IsValid() then
-                    local ok, active = pcall(function() return w:IsActivated() end)
-                    if ok and active then anyActive = true; break end
+                    local activeOk, active = pcall(function() return w:IsActivated() end)
+                    if activeOk and active then return false end
                 end
             end
-        end
-        if not anyActive and onCloseCb then
+            return true
+        end)
+        if not ok then return true end  -- error = stop polling
+        if shouldClose and onCloseCb then
             ExecuteInGameThread(function()
-                onCloseCb()
+                if onCloseCb then onCloseCb() end
             end)
             return true
         end

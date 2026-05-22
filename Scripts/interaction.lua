@@ -216,17 +216,20 @@ function interaction.init(deps)
 
     LoopAsync(100, function()
         if not hoveringOurTerminal then return false end
-        local textBlocks = FindAllOf("TextBlock")
-        if textBlocks then
-            for _, tb in ipairs(textBlocks) do
-                if tb:IsValid() then
-                    local ok, text = pcall(function() return tb:GetText():ToString() end)
-                    if ok and text and text:find("NoA") then
-                        pcall(function() tb:SetText(FText("Use Database Terminal")) end)
+        local ok = pcall(function()
+            local textBlocks = FindAllOf("TextBlock")
+            if textBlocks then
+                for _, tb in ipairs(textBlocks) do
+                    if tb:IsValid() then
+                        local readOk, text = pcall(function() return tb:GetText():ToString() end)
+                        if readOk and text and text:find("NoA") then
+                            pcall(function() tb:SetText(FText("Use Database Terminal")) end)
+                        end
                     end
                 end
             end
-        end
+        end)
+        if not ok then return true end  -- error = stop polling
         return false
     end)
 

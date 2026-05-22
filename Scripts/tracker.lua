@@ -31,16 +31,11 @@ function tracker.loadState()
     end
     if count > 0 then
         print(string.format("[DBTerminal] Restored %d terminal(s) from save\n", count))
-        -- Apply visuals with retries — rendering may reset materials on loaded actors
-        local retries = 0
-        LoopAsync(3000, function()
-            retries = retries + 1
-            if retries > 3 then return true end
+        ExecuteWithDelay(2000, function()
             ExecuteInGameThread(function()
                 visuals.applyAll(terminalActors)
-                print(string.format("[DBTerminal] Applied visuals (attempt %d/3)\n", retries))
+                print("[DBTerminal] Applied visuals to restored terminals\n")
             end)
-            return false
         end)
     else
         print("[DBTerminal] No terminals found in save (or actors not loaded yet)\n")
