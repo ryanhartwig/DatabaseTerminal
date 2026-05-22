@@ -101,6 +101,8 @@ function scanner.scan(terminalPos, radiusMeters)
                                 if not label then label = source.class end
 
                                 -- Get actual actor class for icon differentiation
+                                -- Store both: specific class (for wall vs floor locker)
+                                -- and source class (fallback for icon lookup)
                                 local actorClass = source.class
                                 pcall(function() actorClass = actor:GetClass():GetFName():ToString() end)
 
@@ -120,6 +122,7 @@ function scanner.scan(terminalPos, radiusMeters)
                                             lockerInv = inv,
                                             itemType = s.ItemType,
                                             containerClass = actorClass,
+                                            sourceClass = source.class,
                                         })
                                     end
                                 end
@@ -164,6 +167,7 @@ function scanner.group(items)
                 inventoryId = item.inventoryId,
                 lockerInv = item.lockerInv,
                 containerClass = item.containerClass,
+                sourceClass = item.sourceClass,
                 items = {},
             }
         end

@@ -151,11 +151,18 @@ local CONTAINER_ITEM_TYPES = {
 
 local containerItemTypeCache = {}
 
-local function getContainerItemType(containerClass)
-    if containerItemTypeCache[containerClass] ~= nil then return containerItemTypeCache[containerClass] end
+--- Look up container icon item type, trying actor class first then source class
+local function getContainerItemType(containerClass, sourceClass)
+    local cacheKey = containerClass or sourceClass or ""
+    if containerItemTypeCache[cacheKey] ~= nil then return containerItemTypeCache[cacheKey] end
+
+    -- Try actor class first (e.g. BP_Locker_Floor_C), then source class (e.g. SN2Locker)
     local targetName = CONTAINER_ITEM_TYPES[containerClass]
+    if not targetName and sourceClass then
+        targetName = CONTAINER_ITEM_TYPES[sourceClass]
+    end
     if not targetName then
-        containerItemTypeCache[containerClass] = false
+        containerItemTypeCache[cacheKey] = false
         return nil
     end
     -- Find the UWEItemType by name from all loaded instances
@@ -164,7 +171,7 @@ local function getContainerItemType(containerClass)
         for _, itemType in ipairs(allTypes) do
             local ok, name = pcall(function() return itemType:GetFName():ToString() end)
             if ok and name == targetName then
-                containerItemTypeCache[containerClass] = itemType
+                containerItemTypeCache[cacheKey] = itemType
                 return itemType
             end
         end
@@ -402,13 +409,15 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
 
             -- Container type icon (uses same TSoftObjectPtr pattern as item thumbnails)
             local containerIcon = makeImage(root)
-            local containerType = getContainerItemType(container.containerClass)
+            local containerType = getContainerItemType(container.containerClass, container.sourceClass)
             if containerType then
                 pcall(function()
                     containerIcon:SetBrushFromSoftTexture(containerType.Thumbnail, false)
+                    containerIcon:SetDesiredSizeOverride({ X = 20, Y = 20 })
                 end)
             end
             local cIconSize = makeSizeBox(root, 20, 20)
+            pcall(function() cIconSize:SetMaxDesiredHeight(20) end)
             cIconSize:SetContent(containerIcon)
             subRow:AddChildToHorizontalBox(cIconSize)
 
