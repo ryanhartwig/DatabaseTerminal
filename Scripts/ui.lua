@@ -263,7 +263,7 @@ function ui.onPullComplete(container, group)
         if gw.group == group then
             -- Update group header count
             pcall(function()
-                gw.countText:SetText(FText("  x" .. group.totalCount))
+                gw.countText:SetText(FText("x" .. group.totalCount))
             end)
 
             -- Update sub-row counts
@@ -274,7 +274,7 @@ function ui.onPullComplete(container, group)
                         pcall(function() sr.subRow:SetVisibility(1) end)
                     else
                         pcall(function()
-                            sr.countText:SetText(FText("  x" .. container.count .. "  "))
+                            sr.countText:SetText(FText("x" .. container.count .. "  "))
                         end)
                     end
                 end
@@ -312,11 +312,11 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
     end
 
     -- Item groups
-    for _, group in ipairs(groups) do
+    for idx, group in ipairs(groups) do
         local groupBox = makeVBox(root)
         local gw = { groupBox = groupBox, group = group, countText = nil, subRows = {} }
 
-        -- Item header: icon + name + total count
+        -- Item header: icon + name + (spacer) + total count
         local itemHeader = makeHBox(root)
 
         local icon = makeImage(root)
@@ -327,10 +327,20 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         iconSize:SetContent(icon)
         itemHeader:AddChildToHorizontalBox(iconSize)
 
-        local nameText = makeText(root, "  " .. group.displayName)
+        -- Small gap between icon and name
+        local iconGap = makeSizeBox(root, 8, 1)
+        itemHeader:AddChildToHorizontalBox(iconGap)
+
+        local nameText = makeText(root, group.displayName)
         itemHeader:AddChildToHorizontalBox(nameText)
 
-        local countText = makeText(root, "  x" .. group.totalCount)
+        -- Fill spacer pushes count to the right
+        local headerSpacer = StaticConstructObject(classes.sizeBox, root, newName("Spacer"))
+        pcall(function() headerSpacer:SetMinDesiredWidth(20) end)
+        local headerSpacerSlot = itemHeader:AddChildToHorizontalBox(headerSpacer)
+        pcall(function() headerSpacerSlot:SetSize({ SizeRule = 1, Value = 1.0 }) end)
+
+        local countText = makeText(root, "x" .. group.totalCount)
         itemHeader:AddChildToHorizontalBox(countText)
         gw.countText = countText
 
@@ -340,10 +350,20 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         for _, container in ipairs(group.containerList) do
             local subRow = makeHBox(root)
 
-            local labelText = makeText(root, "        " .. container.label)
+            -- Indentation via fixed-width SizeBox instead of spaces
+            local indent = makeSizeBox(root, 36, 1)
+            subRow:AddChildToHorizontalBox(indent)
+
+            local labelText = makeText(root, container.label)
             subRow:AddChildToHorizontalBox(labelText)
 
-            local subCount = makeText(root, "  x" .. container.count .. "  ")
+            -- Fill spacer pushes count + button to the right
+            local spacer = StaticConstructObject(classes.sizeBox, root, newName("Spacer"))
+            pcall(function() spacer:SetMinDesiredWidth(20) end)
+            local spacerSlot = subRow:AddChildToHorizontalBox(spacer)
+            pcall(function() spacerSlot:SetSize({ SizeRule = 1, Value = 1.0 }) end)
+
+            local subCount = makeText(root, "x" .. container.count .. "  ")
             subRow:AddChildToHorizontalBox(subCount)
 
             local pullBtn = makeButton(root, "PULL", function()
@@ -363,6 +383,16 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         end
 
         scrollBox:AddChild(groupBox)
+
+        -- Add subtle divider line between groups (not after the last one)
+        if idx < #groups then
+            local divider = StaticConstructObject(classes.img, root, newName("Div"))
+            pcall(function() divider:SetColorAndOpacity({ R=0.06, G=0.2, B=0.35, A=0.3 }) end)
+            local divSize = makeSizeBox(root, nil, 2)
+            divSize:SetContent(divider)
+            scrollBox:AddChild(divSize)
+        end
+
         table.insert(groupWidgets, gw)
     end
 end
@@ -421,22 +451,39 @@ function ui.open(groups, closeCb, onPull)
     -- Show at high z-order
     root:AddToViewport(500)
 
-    -- Poll: if NoA widget closes, close our UI too
+    -- Poll: if NoA widget closes (e.g. player walks away), close our UI too.
+    -- Grace period: skip the first few polls so we don't falsely detect
+    -- "no active CTI widget" when InteractEndClient prevented it from opening.
+    -- After the grace period, if a CTI widget IS active we monitor it; if none
+    -- ever appeared we just skip the auto-close (ESC/F6 keys still work).
+    local pollCount = 0
+    local ctiWasActive = false
     LoopAsync(200, function()
         if not root then return true end
-        local ok, shouldClose = pcall(function()
+        pollCount = pollCount + 1
+
+        local ok, anyActive = pcall(function()
             local ctiWidgets = FindAllOf("WBP_ComputerTextInterface_C")
-            if not ctiWidgets then return true end
+            if not ctiWidgets then return false end
             for _, w in ipairs(ctiWidgets) do
                 if w:IsValid() then
                     local activeOk, active = pcall(function() return w:IsActivated() end)
-                    if activeOk and active then return false end
+                    if activeOk and active then return true end
                 end
             end
-            return true
+            return false
         end)
         if not ok then return true end  -- error = stop polling
-        if shouldClose and onCloseCb then
+
+        if anyActive then ctiWasActive = true end
+
+        -- During grace period (first ~600ms), just observe
+        if pollCount <= 3 then return false end
+
+        -- After grace: only close if the CTI widget WAS active and is now gone
+        -- (i.e. the player walked away or the game closed it).
+        -- If it was never active (InteractEndClient path), skip auto-close.
+        if ctiWasActive and not anyActive and onCloseCb then
             ExecuteInGameThread(function()
                 if onCloseCb then onCloseCb() end
             end)

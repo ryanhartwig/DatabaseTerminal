@@ -93,7 +93,9 @@ function interaction.close()
     isOpen = false
     currentTerminal = nil
 
-    -- Restore CTI widget visibility and deactivate it properly
+    -- Restore CTI widget visibility and deactivate it properly (handles both
+    -- the InteractEndClient path where the widget may never have opened, and
+    -- the fallback path where it was hidden).
     local widgets = FindAllOf("WBP_ComputerTextInterface_C")
     if widgets then
         for _, widget in ipairs(widgets) do
@@ -104,7 +106,9 @@ function interaction.close()
         end
     end
 
-    -- Restore game input
+    -- Always restore game input — we now manage input ourselves via
+    -- SetInputMode_UIOnlyEx when the InteractEndClient path succeeds,
+    -- and the fallback path also needs this cleanup.
     local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
     local pc = UEHelpers:GetPlayerController()
     if pc and wbLib then
@@ -159,7 +163,7 @@ local function open(actor)
         end
     end
 
-    -- Open the UI (stacks on top of NoA widget which handles input mode)
+    -- Open the UI
     ui.open(groups, function()
         interaction.close()
     end, onPull)
@@ -184,18 +188,50 @@ function interaction.init(deps)
 
         print("[DBTerminal] Terminal interaction detected\n")
 
-        ExecuteInGameThread(function()
-            -- Show loading screen immediately (masks the NoA widget)
-            showLoadingScreen()
+        -- Try to prevent the NoA widget from ever opening by ending the
+        -- interaction immediately.  InteractEndClient is a native UFunction
+        -- on the terminal Blueprint — calling it here (while InteractClient
+        -- is still executing) should cancel the widget-open path.
+        local pc = UEHelpers:GetPlayerController()
+        local pawn = pc and pc.Pawn
+        local endOk = false
+        if pawn and pawn:IsValid() then
+            endOk = pcall(function() actor:InteractEndClient(pc, pawn) end)
+            if endOk then
+                print("[DBTerminal] InteractEndClient fired — NoA widget should be suppressed\n")
+            else
+                print("[DBTerminal] InteractEndClient failed — falling back to loading screen\n")
+            end
+        end
 
-            -- Let the NoA widget activate (sets up cursor), then hide + open ours
-            ExecuteWithDelay(100, function()
-                ExecuteInGameThread(function()
-                    hideCTIWidget()
-                    removeLoadingScreen()
-                    open(actor)
+        ExecuteInGameThread(function()
+            if endOk then
+                -- InteractEndClient succeeded: NoA widget should not appear.
+                -- Small delay for input mode to settle, then open our UI
+                -- with our own input capture.
+                ExecuteWithDelay(50, function()
+                    ExecuteInGameThread(function()
+                        -- Hide any CTI widget that slipped through anyway
+                        hideCTIWidget()
+                        open(actor)
+                        -- Set up our own input mode (NoA widget is not managing it)
+                        local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+                        if pc and wbLib and ui.getRoot() then
+                            pcall(function() wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true) end)
+                        end
+                    end)
                 end)
-            end)
+            else
+                -- Fallback: loading screen approach (InteractEndClient unavailable)
+                showLoadingScreen()
+                ExecuteWithDelay(50, function()
+                    ExecuteInGameThread(function()
+                        hideCTIWidget()
+                        removeLoadingScreen()
+                        open(actor)
+                    end)
+                end)
+            end
         end)
     end)
 
