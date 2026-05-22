@@ -4,7 +4,7 @@
 local visuals = {}
 
 local ACTOR_CLASS = "BP_ComputerTextInterface_Terminal_PlayerBuilt_C"
-local SCALE = { X = 0.75, Y = 0.75, Z = 0.75 }
+local SCALE = { X = 0.675, Y = 0.675, Z = 0.675 }
 
 -- Material names to apply
 local BODY_MAT = "MI_Alterra_PosterKitty_01a"
