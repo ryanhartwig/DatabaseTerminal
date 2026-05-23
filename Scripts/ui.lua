@@ -513,9 +513,30 @@ local function setupShiftTracking()
     if shiftTrackingSetup then return end
     shiftTrackingSetup = true
 
+    -- Probe Key table for shift key constant name
+    local shiftKey = nil
+    for _, name in ipairs({"LEFT_SHIFT", "LSHIFT", "LeftShift", "SHIFT", "Shift"}) do
+        if Key[name] then
+            shiftKey = Key[name]
+            print(string.format("[DBTerminal] Found shift key: Key.%s\n", name))
+            break
+        end
+    end
+
+    if not shiftKey then
+        -- Dump all Key entries containing "shift" for debugging
+        print("[DBTerminal] No shift key constant found. Available keys with 'shift':\n")
+        for k, v in pairs(Key) do
+            if string.find(string.lower(k), "shift") then
+                print(string.format("[DBTerminal]   Key.%s = %s\n", k, tostring(v)))
+            end
+        end
+        return
+    end
+
     -- Try press/release form: RegisterKeyBind(key, {onPress, onRelease})
     local ok = pcall(function()
-        RegisterKeyBind(Key.LEFT_SHIFT, {
+        RegisterKeyBind(shiftKey, {
             function() shiftHeld = true end,
             function() shiftHeld = false end
         })
@@ -525,7 +546,7 @@ local function setupShiftTracking()
     if not ok then
         -- Fallback: press-only with auto-reset
         pcall(function()
-            RegisterKeyBind(Key.LEFT_SHIFT, function()
+            RegisterKeyBind(shiftKey, function()
                 shiftHeld = true
                 ExecuteWithDelay(400, function()
                     ExecuteInGameThread(function() shiftHeld = false end)
@@ -557,6 +578,8 @@ local function buildSidebar(root, canvas)
             pcall(function()
                 btnSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
             end)
+            -- Fill available width so buttons stretch to sidebar edge
+            pcall(function() btnSlot:SetHorizontalAlignment(3) end) -- 3 = HAlign_Fill
         end
     end
 
