@@ -298,8 +298,8 @@ local function buildBackground(root, canvas)
     local L, R, T, B = PANEL.L, PANEL.R, PANEL.T, PANEL.B
     local G = PANEL.GLOW
 
-    -- Background with hex grid baked in
-    local bgTex = textures.get("Background")
+    -- Background with title baked in (terminal view)
+    local bgTex = textures.get("BackgroundTitle") or textures.get("Background")
     if bgTex then
         local bg = StaticConstructObject(classes.img, root, newName("BG"))
         pcall(function() bg:SetBrushFromTexture(bgTex, false) end)
@@ -356,12 +356,7 @@ local groupWidgets = {}  -- { groupBox, countText, subRows: { subRow, countText,
 -- Header bar
 ----------------------------------------------------------------------
 local function buildHeader(root, canvas, groups, closeCb)
-    -- Title — centered with nudge
-    local title = makeText(root, "DATABASE TERMINAL", "title")
-    local titleSlot = canvas:AddChildToCanvas(title)
-    titleSlot:SetAnchors({ Minimum = { X = pX(0.466), Y = pY(0.06) }, Maximum = { X = pX(0.466), Y = pY(0.06) } })
-    pcall(function() titleSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
-    titleSlot:SetAutoSize(true)
+    -- Title is baked into BackgroundTitle texture
 
     -- Footer version
     local ver = makeText(root, "Database Terminal v1.0.0", "footer")

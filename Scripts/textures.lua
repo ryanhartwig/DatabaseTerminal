@@ -16,6 +16,7 @@ local TEXTURE_DIR = config.ModDir .. "Textures/"
 local TEXTURE_FILES = {
     -- Backgrounds
     Background     = "T_DBTerminal_Background.png",
+    BackgroundTitle = "T_DBTerminal_Background_Title.png",
     Backgroundbare = "T_DBTerminal_Background_No_Hex.png",
     -- UI chrome
     Header     = "T_DBTerminal_Header.png",
