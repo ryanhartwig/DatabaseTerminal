@@ -9,20 +9,26 @@ local config = require("config")
 local function deployAssets()
     local modDir = config.ModDir
     local assetsDir = modDir .. "Assets/"
-    -- Navigate from ue4ss/Mods/DatabaseTerminal/ up to game Content/Paks/~mods/
-    -- Path: DatabaseTerminal → Mods → ue4ss → Win64 → Binaries → Subnautica2 → Content/Paks/~mods/
     local modsTarget = modDir .. "../../../../../Content/Paks/~mods/"
+
+    print(string.format("[DBTerminal] Deploy: modDir=%s\n", modDir))
+    print(string.format("[DBTerminal] Deploy: target=%s\n", modsTarget))
+
+    -- Ensure ~mods/ directory exists
+    pcall(function()
+        os.execute('mkdir "' .. modsTarget:gsub("/", "\\") .. '" 2>nul')
+    end)
 
     local files = { "DatabaseTerminal_P.pak", "DatabaseTerminal_P.ucas", "DatabaseTerminal_P.utoc" }
     for _, filename in ipairs(files) do
         local targetPath = modsTarget .. filename
-        -- Check if already deployed
         local exists = io.open(targetPath, "rb")
         if exists then
             exists:close()
+            print(string.format("[DBTerminal] Deploy: %s already exists\n", filename))
         else
-            -- Copy from Assets/ to ~mods/
-            local src = io.open(assetsDir .. filename, "rb")
+            local srcPath = assetsDir .. filename
+            local src = io.open(srcPath, "rb")
             if src then
                 local data = src:read("*all")
                 src:close()
@@ -31,7 +37,11 @@ local function deployAssets()
                     dst:write(data)
                     dst:close()
                     print(string.format("[DBTerminal] Deployed %s to ~mods/\n", filename))
+                else
+                    print(string.format("[DBTerminal] Deploy FAILED: can't write %s\n", targetPath))
                 end
+            else
+                print(string.format("[DBTerminal] Deploy FAILED: can't read %s\n", srcPath))
             end
         end
     end
