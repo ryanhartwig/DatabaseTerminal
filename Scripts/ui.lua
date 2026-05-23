@@ -503,15 +503,37 @@ function ui.onPullComplete(container, group)
 
 end
 
---- Check if shift key is currently held
-local function isShiftDown()
-    local held = false
-    pcall(function()
-        local pc = UEHelpers:GetPlayerController()
-        held = pc:IsInputKeyDown({ KeyName = FName("LeftShift") })
-            or pc:IsInputKeyDown({ KeyName = FName("RightShift") })
+----------------------------------------------------------------------
+-- Shift key tracking (for category multi-select)
+----------------------------------------------------------------------
+local shiftHeld = false
+local shiftTrackingSetup = false
+
+local function setupShiftTracking()
+    if shiftTrackingSetup then return end
+    shiftTrackingSetup = true
+
+    -- Try press/release form: RegisterKeyBind(key, {onPress, onRelease})
+    local ok = pcall(function()
+        RegisterKeyBind(Key.LEFT_SHIFT, {
+            function() shiftHeld = true end,
+            function() shiftHeld = false end
+        })
+        print("[DBTerminal] Shift tracking: press/release registered\n")
     end)
-    return held
+
+    if not ok then
+        -- Fallback: press-only with auto-reset
+        pcall(function()
+            RegisterKeyBind(Key.LEFT_SHIFT, function()
+                shiftHeld = true
+                ExecuteWithDelay(400, function()
+                    ExecuteInGameThread(function() shiftHeld = false end)
+                end)
+            end)
+            print("[DBTerminal] Shift tracking: press-only with auto-reset\n")
+        end)
+    end
 end
 
 --- Build the category sidebar
@@ -521,13 +543,13 @@ local function buildSidebar(root, canvas)
     local sideSlot = canvas:AddChildToCanvas(sideVBox)
     sideSlot:SetAnchors({
         Minimum = { X = pX(0.04), Y = pY(0.15) },
-        Maximum = { X = pX(0.165), Y = pY(0.93) }
+        Maximum = { X = pX(0.17), Y = pY(0.93) }
     })
     sideSlot:SetAutoSize(false)
 
     for _, catDef in ipairs(cats.ALL) do
         local btn = makeButton(root, catDef.label, function()
-            toggleCategory(catDef.id, isShiftDown())
+            toggleCategory(catDef.id, shiftHeld)
         end)
         if btn then
             categoryButtons[catDef.id] = btn
@@ -729,6 +751,7 @@ function ui.open(groups, closeCb, onPull, refreshCb)
     computeBounds()   -- recalculate PANEL anchors for current viewport size
     styles.captureGameFont()  -- grab game font asset for styled text
     registerButtonHook()
+    setupShiftTracking()
 
     scanGroups = groups
     onCloseCb = closeCb
