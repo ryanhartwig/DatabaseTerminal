@@ -5,7 +5,13 @@
 
 local state = {}
 
-local STATE_FILE = debug.getinfo(1, "S").source:match("@(.*/)")  .. "../state.json"
+-- State stored outside mod folder so it survives mod updates
+local MOD_DIR = debug.getinfo(1, "S").source:match("@(.*/)")  .. "../"
+local DATA_DIR = MOD_DIR .. "../DatabaseTerminal_data/"
+local STATE_FILE = DATA_DIR .. "state.json"
+
+-- Ensure data directory exists
+pcall(function() os.execute('mkdir "' .. DATA_DIR:gsub("/", "\\") .. '" 2>nul') end)
 local MATCH_DISTANCE = 50  -- units (0.5 meters) — tolerance for position matching
 
 ----------------------------------------------------------------------
