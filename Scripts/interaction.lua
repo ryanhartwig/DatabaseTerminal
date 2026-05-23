@@ -405,7 +405,7 @@ local function open(actor)
             return
         end
 
-        -- Verify the item still exists in the source container (prevents
+        -- Verify the item type still exists in the source container (prevents
         -- pulling from another player's inventory if they took it first)
         local stillExists = false
         pcall(function()
@@ -414,7 +414,7 @@ local function open(actor)
                 for _, item in ipairs(sourceItems) do
                     pcall(function()
                         local s = item:get()
-                        if s.ItemId == itemEntry.itemId then
+                        if s.ItemType:GetFName():ToString() == itemEntry.typeName then
                             stillExists = true
                         end
                     end)
