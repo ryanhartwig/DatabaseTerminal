@@ -84,8 +84,20 @@ local function rootTextures()
 end
 
 --- Import all textures from disk. Only imports missing entries.
---- Call once after world loads; textures persist until mod reload.
+--- If the anchor widget was destroyed (e.g. save switch), clears cache
+--- and reimports everything to avoid dangling texture pointers.
 function textures.loadAll()
+    -- Check if anchor is still alive — save switches destroy viewport widgets
+    if anchor then
+        local anchorValid = false
+        pcall(function() anchorValid = anchor:IsValid() end)
+        if not anchorValid then
+            print("[DBTerminal] Texture anchor lost (save switch?) — reimporting\n")
+            cache = {}
+            anchor = nil
+        end
+    end
+
     if not krl then
         krl = StaticFindObject("/Script/Engine.Default__KismetRenderingLibrary")
     end
