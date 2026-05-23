@@ -479,30 +479,26 @@ end
 
 --- Build the category sidebar
 local function buildSidebar(root, canvas)
-    -- Sidebar vertical box anchored to left side of panel
-    local sideVBox = makeVBox(root)
-    local sideSlot = canvas:AddChildToCanvas(sideVBox)
-    sideSlot:SetAnchors({
-        Minimum = { X = pX(0.05), Y = pY(0.15) },
-        Maximum = { X = pX(0.17), Y = pY(0.93) }
-    })
-    sideSlot:SetAutoSize(false)
+    -- Buttons placed directly on canvas (VBox constrains their width)
+    local startY = 0.15
+    local stepY = 0.045  -- spacing between buttons
 
-    for _, catDef in ipairs(cats.ALL) do
+    for i, catDef in ipairs(cats.ALL) do
         local btn = makeButton(root, catDef.label, function()
             toggleCategory(catDef.id)
         end)
         if btn then
             categoryButtons[catDef.id] = btn
-            pcall(function() btn:SetDesiredSizeOverride({ X = 200, Y = 0 }) end)
-            local btnSlot = sideVBox:AddChildToVerticalBox(btn)
-            pcall(function()
-                btnSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
-            end)
+            local btnSlot = canvas:AddChildToCanvas(btn)
+            local yPos = startY + (i - 1) * stepY
+            btnSlot:SetAnchors({
+                Minimum = { X = pX(0.05), Y = pY(yPos) },
+                Maximum = { X = pX(0.05), Y = pY(yPos) }
+            })
+            btnSlot:SetAutoSize(true)
         end
     end
 
-    -- Set initial button opacity (All = full, others = dimmed)
     applyFilters()
 end
 

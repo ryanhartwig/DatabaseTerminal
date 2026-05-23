@@ -480,34 +480,28 @@ function interaction.init(deps)
 
         ExecuteInGameThread(function()
             if interactionGen ~= myGen then return end
-            -- Show loading screen instantly
-            pcall(function() showLoadingScreen() end)
 
-            -- After delay, transition to the main UI
-            ExecuteWithDelay(1800, function()
+            -- Refresh settings from SN2ModSettings before each interaction
+            pcall(function() config.refreshModSettings() end)
+
+            -- Shared function: open the terminal UI after loading/skip
+            local function openTerminalUI()
                 ExecuteInGameThread(function()
-                    -- Bail if this interaction was cancelled (user hit ESC/F6)
                     if interactionGen ~= myGen then return end
-
                     pcall(function()
-                        -- Verify actor is still valid before using it
                         if not actor or not actor:IsValid() then
                             print("[DBTerminal] Actor no longer valid — aborting\n")
                             interaction.close()
                             return
                         end
-
                         hideLoadingScreen()
-                        -- Reset isOpen so open() doesn't double-close
                         isOpen = false
                         open(actor)
-                        -- Set up input mode and show cursor
                         local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
                         local pc = UEHelpers:GetPlayerController()
                         if pc and wbLib and ui.getRoot() then
                             wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true)
                             pc.bShowMouseCursor = true
-                            -- Center cursor on screen
                             pcall(function()
                                 local vpSize = { X = 0, Y = 0 }
                                 pcall(function()
@@ -521,7 +515,62 @@ function interaction.init(deps)
                         end
                     end)
                 end)
-            end)
+            end
+
+            if config.SkipLoadingScreen then
+                -- Push modal blocker (normally done inside showLoadingScreen)
+                pcall(function()
+                    local modalCls = StaticFindObject("/Script/UWECommonUI.ModalActivatableWidget")
+                    local wm = FindFirstOf("WindowManager")
+                    if wm and modalCls then
+                        modalBlocker = wm:PushToLayer(3, modalCls)
+                    end
+                end)
+                -- Show terminal immediately with empty content, then refresh
+                pcall(function() textures.loadAll() end)
+                styles.captureGameFont()
+                isOpen = false
+                -- Open with empty groups so UI renders instantly
+                ui.open({}, function() interaction.close() end, nil, function()
+                    -- Refresh callback triggers real scan
+                    if ui then ui.close() end
+                    isOpen = false
+                    open(actor)
+                    local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+                    local pc = UEHelpers:GetPlayerController()
+                    if pc and wbLib and ui.getRoot() then
+                        wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true)
+                        pc.bShowMouseCursor = true
+                    end
+                end)
+                isOpen = true
+                -- Set up input + cursor
+                local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+                local pc = UEHelpers:GetPlayerController()
+                if pc and wbLib and ui.getRoot() then
+                    wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true)
+                    pc.bShowMouseCursor = true
+                end
+                -- Auto-trigger refresh after a frame
+                ExecuteWithDelay(50, function()
+                    ExecuteInGameThread(function()
+                        if interactionGen ~= myGen then return end
+                        if ui then ui.close() end
+                        isOpen = false
+                        open(actor)
+                        local wbLib2 = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+                        local pc2 = UEHelpers:GetPlayerController()
+                        if pc2 and wbLib2 and ui.getRoot() then
+                            wbLib2:SetInputMode_UIOnlyEx(pc2, ui.getRoot(), 0, true)
+                            pc2.bShowMouseCursor = true
+                        end
+                    end)
+                end)
+            else
+                -- Show loading screen with boot animation
+                pcall(function() showLoadingScreen() end)
+                ExecuteWithDelay(1800, openTerminalUI)
+            end
         end)
     end)
 

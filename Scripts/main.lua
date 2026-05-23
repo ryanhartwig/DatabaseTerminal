@@ -43,6 +43,63 @@ if not deployOk then
 end
 
 ----------------------------------------------------------------------
+-- SN2ModSettings manifest (optional — no-op if not installed)
+----------------------------------------------------------------------
+do
+    local SN2_DIR = "./ue4ss/Mods/SN2ModSettings/"
+    local REG_DIR = SN2_DIR .. "registrations/"
+    local MANIFEST = [=[return {
+    name     = "DatabaseTerminal",
+    display  = "Database Terminal",
+    version  = "1.0.0",
+    nexus_id = "",
+    settings = {
+        { key="radius", title="Scan Radius (meters)",
+          description="How far the terminal scans for nearby containers.",
+          type="slider", default=25, min=5, max=100, step=5, format="integer" },
+
+        { key="skip_loading", title="Skip Loading Screen",
+          description="Skip the boot animation and go straight to the item browser.",
+          type="toggle", default=false },
+    },
+}
+]=]
+
+    local enabledFile = io.open(SN2_DIR .. "enabled.txt", "r")
+    if enabledFile then
+        enabledFile:close()
+        local attempts = 0
+        local MAX_ATTEMPTS = 10
+        local function tryWriteManifest()
+            attempts = attempts + 1
+            local selfManifest = io.open(REG_DIR .. "SN2ModSettings.lua", "r")
+            local initialized = selfManifest ~= nil
+            if selfManifest then selfManifest:close() end
+
+            if initialized or attempts >= MAX_ATTEMPTS then
+                if not initialized then
+                    os.execute('mkdir "' .. REG_DIR:gsub("/", "\\") .. '" 2>nul')
+                end
+                local f = io.open(REG_DIR .. "DatabaseTerminal.lua", "w")
+                if f then
+                    f:write(MANIFEST)
+                    f:close()
+                    print(string.format("[DBTerminal] SN2ModSettings manifest written (attempt %d/%d)\n",
+                        attempts, MAX_ATTEMPTS))
+                end
+            else
+                ExecuteWithDelay(1000, function()
+                    ExecuteInGameThread(tryWriteManifest)
+                end)
+            end
+        end
+        ExecuteWithDelay(1000, function()
+            ExecuteInGameThread(tryWriteManifest)
+        end)
+    end
+end
+
+----------------------------------------------------------------------
 -- Module init
 ----------------------------------------------------------------------
 local scanner = require("scanner")

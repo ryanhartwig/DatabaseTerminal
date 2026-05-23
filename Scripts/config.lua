@@ -2,9 +2,10 @@
 
 local config = {}
 config.ModDir = debug.getinfo(1, "S").source:match("@(.*/)")  .. "../"
-config.ScanRadius = 25       -- meters
-config.RefreshInterval = 5   -- seconds
+config.ScanRadius = 25              -- meters
+config.RefreshInterval = 5          -- seconds
 config.Notify = true
+config.SkipLoadingScreen = false    -- skip boot animation, go straight to terminal
 
 local function loadConfig()
     local file = io.open(config.ModDir .. "config.txt", "r")
@@ -19,6 +20,8 @@ local function loadConfig()
                 config.RefreshInterval = tonumber(val) or config.RefreshInterval
             elseif key == "notify" then
                 config.Notify = val ~= "false" and val ~= "0"
+            elseif key == "skip_loading" then
+                config.SkipLoadingScreen = val == "true" or val == "1"
             end
         end
     end
@@ -26,4 +29,30 @@ local function loadConfig()
 end
 
 loadConfig()
+
+----------------------------------------------------------------------
+-- SN2ModSettings integration (optional — graceful if not installed)
+----------------------------------------------------------------------
+local settingsMap = {
+    { key = "radius",       field = "ScanRadius",        type = "number" },
+    { key = "skip_loading", field = "SkipLoadingScreen",  type = "boolean" },
+}
+
+function config.refreshModSettings()
+    if not ModRef then return end
+    for _, entry in ipairs(settingsMap) do
+        local ok, val = pcall(function()
+            return ModRef:GetSharedVariable("SN2ModSettings/DatabaseTerminal/" .. entry.key)
+        end)
+        if ok and val ~= nil and type(val) == entry.type then
+            if entry.type == "number" then
+                val = math.floor(val + 0.5)
+            end
+            config[entry.field] = val
+        end
+    end
+end
+
+config.refreshModSettings()
+
 return config
