@@ -56,7 +56,7 @@ do
     settings = {
         { key="radius", title="Scan Radius (meters)",
           description="How far the terminal scans for nearby containers.",
-          type="slider", default=25, min=5, max=100, step=5, format="integer" },
+          type="slider", default=25, min=5, max=235, step=5, format="integer" },
 
         { key="skip_loading", title="Skip Loading Screen",
           description="Skip the boot animation and go straight to the item browser.",
