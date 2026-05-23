@@ -494,13 +494,12 @@ local function buildSidebar(root, canvas)
         end)
         if btn then
             categoryButtons[catDef.id] = btn
-            local btnSlot = sideVBox:AddChildToVerticalBox(btn)
+            local btnBox = makeSizeBox(root, 160)
+            btnBox:SetContent(btn)
+            local boxSlot = sideVBox:AddChildToVerticalBox(btnBox)
             pcall(function()
-                btnSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
+                boxSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
             end)
-            -- Stretch button to fill sidebar width
-            pcall(function() btnSlot:SetHorizontalAlignment(3) end) -- HAlign_Fill
-            pcall(function() btn:SetMinDesiredWidth(200) end)
         end
     end
 
