@@ -390,44 +390,18 @@ local function applyFilters()
     end
 end
 
---- Toggle a category on/off
---- Regular click = exclusive select, Shift+click = additive toggle
-local function toggleCategory(catId, shiftHeld)
+--- Toggle a category — exclusive select, click again to revert to All
+local function toggleCategory(catId)
     if catId == "all" then
         allActive = true
         activeCategories = {}
-    elseif shiftHeld then
-        -- Shift+click: additive toggle
-        if allActive then
-            allActive = false
-            activeCategories = {}
-        end
-        if activeCategories[catId] then
-            activeCategories[catId] = nil
-            if not next(activeCategories) then
-                allActive = true
-            end
-        else
-            activeCategories[catId] = true
-        end
+    elseif not allActive and activeCategories[catId] then
+        -- Clicking the active category reverts to All
+        allActive = true
+        activeCategories = {}
     else
-        -- Regular click: exclusive select
-        if not allActive and activeCategories[catId] then
-            -- Already active — if it's the only one, revert to All
-            local onlyOne = true
-            for k, _ in pairs(activeCategories) do
-                if k ~= catId then onlyOne = false; break end
-            end
-            if onlyOne then
-                allActive = true
-                activeCategories = {}
-            else
-                activeCategories = { [catId] = true }
-            end
-        else
-            allActive = false
-            activeCategories = { [catId] = true }
-        end
+        allActive = false
+        activeCategories = { [catId] = true }
     end
     applyFilters()
 end
@@ -503,39 +477,6 @@ function ui.onPullComplete(container, group)
 
 end
 
-----------------------------------------------------------------------
--- Shift+click tracking (for category multi-select)
-----------------------------------------------------------------------
-local shiftHeld = false
-local shiftTrackingSetup = false
-
-local function setupShiftTracking()
-    if shiftTrackingSetup then return end
-    shiftTrackingSetup = true
-
-    -- UE4SS Key table lacks shift entries, try raw VK codes
-    -- VK_LSHIFT=160, VK_RSHIFT=161, VK_SHIFT=16
-    local registered = false
-    for _, vk in ipairs({160, 161, 16}) do
-        local ok = pcall(function()
-            RegisterKeyBind(vk, function()
-                shiftHeld = true
-                ExecuteWithDelay(500, function()
-                    ExecuteInGameThread(function() shiftHeld = false end)
-                end)
-            end)
-        end)
-        if ok then
-            registered = true
-            print(string.format("[DBTerminal] Shift tracking registered (VK=%d)\n", vk))
-        end
-    end
-
-    if not registered then
-        print("[DBTerminal] Shift tracking failed — multi-select unavailable\n")
-    end
-end
-
 --- Build the category sidebar
 local function buildSidebar(root, canvas)
     -- Sidebar vertical box anchored to left side of panel
@@ -549,16 +490,18 @@ local function buildSidebar(root, canvas)
 
     for _, catDef in ipairs(cats.ALL) do
         local btn = makeButton(root, catDef.label, function()
-            toggleCategory(catDef.id, shiftHeld)
+            toggleCategory(catDef.id)
         end)
         if btn then
             categoryButtons[catDef.id] = btn
-            local btnSlot = sideVBox:AddChildToVerticalBox(btn)
+            -- Wrap in SizeBox to force width
+            local btnBox = makeSizeBox(root, 140)
+            btnBox:SetContent(btn)
+            local boxSlot = sideVBox:AddChildToVerticalBox(btnBox)
             pcall(function()
-                btnSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
+                boxSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
             end)
-            -- Fill available width so buttons stretch to sidebar edge
-            pcall(function() btnSlot:SetHorizontalAlignment(3) end) -- 3 = HAlign_Fill
+            pcall(function() boxSlot:SetHorizontalAlignment(3) end) -- HAlign_Fill
         end
     end
 
@@ -753,7 +696,6 @@ function ui.open(groups, closeCb, onPull, refreshCb)
     computeBounds()   -- recalculate PANEL anchors for current viewport size
     styles.captureGameFont()  -- grab game font asset for styled text
     registerButtonHook()
-    setupShiftTracking()
 
     scanGroups = groups
     onCloseCb = closeCb
