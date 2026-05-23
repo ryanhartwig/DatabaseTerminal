@@ -418,7 +418,19 @@ local function open(actor)
     -- Open the UI
     ui.open(groups, function()
         interaction.close()
-    end, onPull)
+    end, onPull, function()
+        -- Refresh: close UI and immediately reopen with fresh scan
+        if ui then ui.close() end
+        isOpen = false
+        open(actor)
+        -- Restore input mode
+        local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+        local pc = UEHelpers:GetPlayerController()
+        if pc and wbLib and ui.getRoot() then
+            wbLib:SetInputMode_UIOnlyEx(pc, ui.getRoot(), 0, true)
+            pc.bShowMouseCursor = true
+        end
+    end)
 
     print("[DBTerminal] UI opened.\n")
 end

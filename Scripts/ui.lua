@@ -614,7 +614,7 @@ end
 -- Public API
 ----------------------------------------------------------------------
 
-function ui.open(groups, closeCb, onPull)
+function ui.open(groups, closeCb, onPull, refreshCb)
     if not initClasses() then
         print("[DBTerminal] Failed to init widget classes\n")
         return
@@ -648,10 +648,23 @@ function ui.open(groups, closeCb, onPull)
     buildBackground(root, canvas)
     buildHeader(root, canvas, groups, closeCb)
 
-    -- Search box with animated material background
+    -- Refresh button (top-right of content area)
+    if refreshCb then
+        local refreshBtn = makeButton(root, "REFRESH", function()
+            refreshCb()
+        end)
+        local refreshSlot = canvas:AddChildToCanvas(refreshBtn)
+        refreshSlot:SetAnchors({
+            Minimum = { X = PANEL.R - PANEL.CONTENT_PAD - 0.12, Y = PANEL.T + PANEL.HEADER_H + 0.015 },
+            Maximum = { X = PANEL.R - PANEL.CONTENT_PAD - 0.12, Y = PANEL.T + PANEL.HEADER_H + 0.015 }
+        })
+        refreshSlot:SetAutoSize(true)
+    end
+
+    -- Search box
     local searchY = PANEL.T + PANEL.HEADER_H + 0.015
     local searchL = PANEL.L + PANEL.CONTENT_PAD + 0.01
-    local searchR = PANEL.R - PANEL.CONTENT_PAD - 0.01
+    local searchR = PANEL.R - PANEL.CONTENT_PAD - 0.08  -- leave room for refresh button
 
     local searchBox = StaticConstructObject(classes.editText, root, FName("SearchBox"))
     pcall(function() searchBox:SetText(FText("")) end)
