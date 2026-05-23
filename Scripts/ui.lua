@@ -4,6 +4,7 @@
 local UEHelpers = require("UEHelpers")
 local textures = require("textures")
 local styles = require("styles")
+local cats = require("categories")
 local ui = {}
 
 ----------------------------------------------------------------------
@@ -352,6 +353,71 @@ end
 -- Widget references for live updates
 local groupWidgets = {}  -- { groupBox, countText, subRows: { subRow, countText, container, group } }
 
+-- Category filter state
+local activeCategories = {}   -- { [catId] = true } for active filters
+local allActive = true        -- true = "All" is active, show everything
+local categoryButtons = {}    -- { [catId] = buttonWidget } for opacity toggling
+
+--- Apply category filters to all group widgets
+local function applyFilters()
+    -- Update button opacity
+    for _, catDef in ipairs(cats.ALL) do
+        local btn = categoryButtons[catDef.id]
+        if not btn then goto continue end
+        if catDef.id == "all" then
+            pcall(function() btn:SetRenderOpacity(allActive and 1.0 or 0.3) end)
+        else
+            if allActive then
+                pcall(function() btn:SetRenderOpacity(0.3) end)
+            else
+                local isActive = activeCategories[catDef.id]
+                pcall(function() btn:SetRenderOpacity(isActive and 1.0 or 0.3) end)
+            end
+        end
+        ::continue::
+    end
+
+    -- Show/hide groups
+    for _, gw in ipairs(groupWidgets) do
+        local visible = allActive or activeCategories[gw.group.category]
+        -- Only change visibility for non-empty groups (don't resurrect pulled-empty groups)
+        if gw.group.totalCount > 0 then
+            pcall(function() gw.groupBox:SetVisibility(visible and 0 or 1) end)
+        end
+        if gw.divider then
+            if gw.group.totalCount > 0 then
+                pcall(function() gw.divider:SetVisibility(visible and 0 or 1) end)
+            end
+        end
+    end
+end
+
+--- Toggle a category on/off
+local function toggleCategory(catId)
+    if catId == "all" then
+        -- Reset to "All" mode
+        allActive = true
+        activeCategories = {}
+    else
+        if allActive then
+            -- Switching from All → specific category
+            allActive = false
+            activeCategories = {}
+        end
+        -- Toggle this category
+        if activeCategories[catId] then
+            activeCategories[catId] = nil
+            -- If nothing is active, revert to All
+            if not next(activeCategories) then
+                allActive = true
+            end
+        else
+            activeCategories[catId] = true
+        end
+    end
+    applyFilters()
+end
+
 ----------------------------------------------------------------------
 -- Header bar
 ----------------------------------------------------------------------
@@ -423,13 +489,41 @@ function ui.onPullComplete(container, group)
 
 end
 
+--- Build the category sidebar
+local function buildSidebar(root, canvas)
+    -- Sidebar vertical box anchored to left side of panel
+    local sideVBox = makeVBox(root)
+    local sideSlot = canvas:AddChildToCanvas(sideVBox)
+    sideSlot:SetAnchors({
+        Minimum = { X = pX(0.03), Y = pY(0.15) },
+        Maximum = { X = pX(0.17), Y = pY(0.93) }
+    })
+    sideSlot:SetAutoSize(false)
+
+    for _, catDef in ipairs(cats.ALL) do
+        local btn = makeButton(root, catDef.label, function()
+            toggleCategory(catDef.id)
+        end)
+        if btn then
+            categoryButtons[catDef.id] = btn
+            local btnSlot = sideVBox:AddChildToVerticalBox(btn)
+            pcall(function()
+                btnSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
+            end)
+        end
+    end
+
+    -- Set initial opacity (All active, others dimmed)
+    applyFilters()
+end
+
 local function buildContent(root, canvas, scrollBox, groups, pullCallback)
     groupWidgets = {}
 
     -- Position scrollbox (all panel-relative)
     local scrollSlot = canvas:AddChildToCanvas(scrollBox)
     scrollSlot:SetAnchors({
-        Minimum = { X = pX(0.04), Y = pY(0.15) },
+        Minimum = { X = pX(0.19), Y = pY(0.15) },
         Maximum = { X = pX(0.96), Y = pY(0.93) }
     })
     scrollSlot:SetAutoSize(false)
@@ -631,10 +725,11 @@ function ui.open(groups, closeCb, onPull, refreshCb)
     -- Build layers
     buildBackground(root, canvas)
     buildHeader(root, canvas, groups, closeCb)
+    buildSidebar(root, canvas)
 
     -- Search box + refresh button (panel-relative)
     local searchY = pY(0.095)
-    local searchL = pX(0.04)
+    local searchL = pX(0.19)
     local searchR = pX(0.96)
 
     if refreshCb then
@@ -684,10 +779,17 @@ function ui.open(groups, closeCb, onPull, refreshCb)
 
         local filter = searchText:lower()
         for _, gw in ipairs(groupWidgets) do
-            local match = (filter == "") or gw.group.displayName:lower():find(filter, 1, true)
+            local searchMatch = (filter == "") or gw.group.displayName:lower():find(filter, 1, true)
+            local catMatch = allActive or activeCategories[gw.group.category]
+            local visible = searchMatch and catMatch and (gw.group.totalCount > 0)
             pcall(function()
-                gw.groupBox:SetVisibility(match and 0 or 1)
+                gw.groupBox:SetVisibility(visible and 0 or 1)
             end)
+            if gw.divider then
+                pcall(function()
+                    gw.divider:SetVisibility(visible and 0 or 1)
+                end)
+            end
         end
         return false
     end)
@@ -703,6 +805,9 @@ end
 function ui.close()
     buttonActions = {}
     groupWidgets = {}
+    activeCategories = {}
+    allActive = true
+    categoryButtons = {}
     messageWidget = nil
 
     if root then
