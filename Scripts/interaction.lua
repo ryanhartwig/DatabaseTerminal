@@ -111,8 +111,13 @@ local function showLoadingScreen()
     local L, R, T, B = getPanelBounds(pc)
     local panelW = R - L
     local panelH = B - T
-    local midX = (L + R) / 2 + CENTER_NUDGE_X * panelW
-    local midY = (T + B) / 2 + CENTER_NUDGE_Y * panelH
+
+    -- Panel-relative position helpers (fraction 0-1 within panel bounds)
+    local function lpX(frac) return L + frac * panelW end
+    local function lpY(frac) return T + frac * panelH end
+
+    local midX = lpX(0.5 + CENTER_NUDGE_X)
+    local midY = lpY(0.5 + CENTER_NUDGE_Y)
 
     -- Background (with hex grid baked in)
     local bgTex = textures.get("Background")
@@ -181,10 +186,10 @@ local function showLoadingScreen()
 
     -- Footer version
     local ver = StaticConstructObject(textCls, root, FName("LoadVer"))
-    ver:SetText(FText("Database Terminal v0.1.0"))
+    ver:SetText(FText("Database Terminal v1.0.0"))
     styles.apply(ver, "footer")
     local verSlot = canvas:AddChildToCanvas(ver)
-    verSlot:SetAnchors({ Minimum = { X = L+0.05, Y = B-0.065 }, Maximum = { X = L+0.05, Y = B-0.065 } })
+    verSlot:SetAnchors({ Minimum = { X = lpX(0.06), Y = lpY(0.92) }, Maximum = { X = lpX(0.06), Y = lpY(0.92) } })
     verSlot:SetAutoSize(true)
 
     ----------------------------------------------------------------
@@ -194,7 +199,7 @@ local function showLoadingScreen()
     label:SetText(FText("Scanning containers..."))
     styles.apply(label, "loadingSub")
     local labelSlot = canvas:AddChildToCanvas(label)
-    labelSlot:SetAnchors({ Minimum = { X = midX, Y = midY + 0.16 }, Maximum = { X = midX, Y = midY + 0.16 } })
+    labelSlot:SetAnchors({ Minimum = { X = midX, Y = lpY(0.66) }, Maximum = { X = midX, Y = lpY(0.66) } })
     labelSlot:SetAutoSize(true)
     pcall(function() labelSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
 
@@ -211,7 +216,7 @@ local function showLoadingScreen()
             logoBox:SetHeightOverride(50)
             logoBox:SetContent(logoImg)
             local logoSlot = canvas:AddChildToCanvas(logoBox)
-            logoSlot:SetAnchors({ Minimum = { X = midX, Y = midY + 0.22 }, Maximum = { X = midX, Y = midY + 0.22 } })
+            logoSlot:SetAnchors({ Minimum = { X = midX, Y = lpY(0.72) }, Maximum = { X = midX, Y = lpY(0.72) } })
             logoSlot:SetAutoSize(true)
             logoSlot:SetAlignment({ X = 0.5, Y = 0.5 })
         end

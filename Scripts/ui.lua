@@ -203,10 +203,17 @@ local PANEL_HEIGHT = 0.80  -- fraction of viewport height (0.0–1.0, tune this)
 
 local PANEL = {
     L = 0.10, R = 0.90, T = 0.10, B = 0.90,  -- defaults (overwritten by computeBounds)
-    GLOW = 0.008,
-    HEADER_H = 0.065,
-    CONTENT_PAD = 0.02,
 }
+
+--- Get panel-relative X position (fraction 0-1 of panel width from left edge)
+local function pX(frac)
+    return PANEL.L + frac * (PANEL.R - PANEL.L)
+end
+
+--- Get panel-relative Y position (fraction 0-1 of panel height from top edge)
+local function pY(frac)
+    return PANEL.T + frac * (PANEL.B - PANEL.T)
+end
 
 --- Recalculate panel anchors based on viewport dimensions.
 --- Panel always fills 90% of viewport height, width derived from design ratio.
@@ -300,52 +307,41 @@ local function buildBackground(root, canvas)
         bgSlot:SetAnchors({ Minimum = { X = L, Y = T }, Maximum = { X = R, Y = B } })
         bgSlot:SetAutoSize(false)
     else
-        -- Fallback: rectangle-based background
+        -- Fallback: rectangle-based background (all positions panel-relative)
+        local G = 0.01
         makeRect(root, canvas, "OuterGlow",
             { R=0.04, G=0.12, B=0.22, A=0.6 },
-            L-G, T-G, R+G, B+G)
-
+            pX(-G), pY(-G), pX(1+G), pY(1+G))
         makeRect(root, canvas, "MainBG",
             { R=0.015, G=0.025, B=0.05, A=0.94 },
             L, T, R, B)
-
         makeRect(root, canvas, "GradTop",
             { R=0.05, G=0.10, B=0.18, A=0.35 },
-            L, T, R, T+0.12)
-
+            L, T, R, pY(0.13))
         makeRect(root, canvas, "GradBot",
             { R=0.005, G=0.01, B=0.02, A=0.4 },
-            L, B-0.08, R, B)
-
+            L, pY(0.90), R, B)
         makeRect(root, canvas, "AccentTop",
             { R=0.1, G=0.65, B=0.95, A=0.85 },
-            L, T, R, T+0.004)
-
+            L, T, R, pY(0.005))
         makeRect(root, canvas, "AccentBot",
             { R=0.06, G=0.35, B=0.6, A=0.5 },
-            L, B-0.003, R, B)
-
+            L, pY(0.996), R, B)
         makeRect(root, canvas, "AccentLeft",
             { R=0.06, G=0.35, B=0.6, A=0.3 },
-            L, T, L+0.002, B)
-
+            L, T, pX(0.003), B)
         makeRect(root, canvas, "AccentRight",
             { R=0.06, G=0.35, B=0.6, A=0.3 },
-            R-0.002, T, R, B)
-        -- Header separator
+            pX(0.997), T, R, B)
         makeRect(root, canvas, "SepHeader",
             { R=0.08, G=0.4, B=0.65, A=0.45 },
-            L+PANEL.CONTENT_PAD, T+PANEL.HEADER_H, R-PANEL.CONTENT_PAD, T+PANEL.HEADER_H+0.003)
-
-        -- Content area inner border
+            pX(0.03), pY(0.08), pX(0.97), pY(0.084))
         makeRect(root, canvas, "InnerBorder",
             { R=0.03, G=0.08, B=0.15, A=0.3 },
-            L+0.015, T+PANEL.HEADER_H+0.01, R-0.015, B-0.015)
-
-        -- Footer separator
+            pX(0.02), pY(0.09), pX(0.98), pY(0.98))
         makeRect(root, canvas, "FooterSep",
             { R=0.08, G=0.4, B=0.65, A=0.25 },
-            L+PANEL.CONTENT_PAD, B-0.045, R-PANEL.CONTENT_PAD, B-0.042)
+            pX(0.03), pY(0.94), pX(0.97), pY(0.944))
     end
 end
 
@@ -360,21 +356,17 @@ local groupWidgets = {}  -- { groupBox, countText, subRows: { subRow, countText,
 -- Header bar
 ----------------------------------------------------------------------
 local function buildHeader(root, canvas, groups, closeCb)
-    local L, R, T = PANEL.L, PANEL.R, PANEL.T
-
-    -- Title
+    -- Title — centered with nudge
     local title = makeText(root, "DATABASE TERMINAL", "title")
     local titleSlot = canvas:AddChildToCanvas(title)
-    local panelW = R - L
-    local titleMidX = (L + R) / 2 - 0.034 * panelW  -- same nudge as loading screen
-    titleSlot:SetAnchors({ Minimum = { X = titleMidX, Y = T+0.05 }, Maximum = { X = titleMidX, Y = T+0.05 } })
+    titleSlot:SetAnchors({ Minimum = { X = pX(0.466), Y = pY(0.06) }, Maximum = { X = pX(0.466), Y = pY(0.06) } })
     pcall(function() titleSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
     titleSlot:SetAutoSize(true)
 
     -- Footer version
-    local ver = makeText(root, "Database Terminal v0.1.0", "footer")
+    local ver = makeText(root, "Database Terminal v1.0.0", "footer")
     local verSlot = canvas:AddChildToCanvas(ver)
-    verSlot:SetAnchors({ Minimum = { X = L+0.05, Y = PANEL.B-0.066 }, Maximum = { X = L+0.05, Y = PANEL.B-0.066 } })
+    verSlot:SetAnchors({ Minimum = { X = pX(0.06), Y = pY(0.92) }, Maximum = { X = pX(0.06), Y = pY(0.92) } })
     verSlot:SetAutoSize(true)
 
     -- Alterra glitch logo — top-right, fixed pixel size to prevent stretch
@@ -387,7 +379,7 @@ local function buildHeader(root, canvas, groups, closeCb)
             local logoBox = makeSizeBox(root, 80, 50)
             logoBox:SetContent(logoImg)
             local logoSlot = canvas:AddChildToCanvas(logoBox)
-            logoSlot:SetAnchors({ Minimum = { X = R - 0.10, Y = T + 0.055 }, Maximum = { X = R - 0.10, Y = T + 0.055 } })
+            logoSlot:SetAnchors({ Minimum = { X = pX(0.87), Y = pY(0.06) }, Maximum = { X = pX(0.87), Y = pY(0.06) } })
             logoSlot:SetAutoSize(true)
             pcall(function() logoSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
         end
@@ -439,13 +431,11 @@ end
 local function buildContent(root, canvas, scrollBox, groups, pullCallback)
     groupWidgets = {}
 
-    -- Position scrollbox
-    local contentTop = PANEL.T + PANEL.HEADER_H + 0.055  -- extra space for search box
-    local contentBot = PANEL.B - 0.055
+    -- Position scrollbox (all panel-relative)
     local scrollSlot = canvas:AddChildToCanvas(scrollBox)
     scrollSlot:SetAnchors({
-        Minimum = { X = PANEL.L + PANEL.CONTENT_PAD + 0.01, Y = contentTop },
-        Maximum = { X = PANEL.R - PANEL.CONTENT_PAD - 0.01, Y = contentBot }
+        Minimum = { X = pX(0.04), Y = pY(0.15) },
+        Maximum = { X = pX(0.96), Y = pY(0.93) }
     })
     scrollSlot:SetAutoSize(false)
 
@@ -592,8 +582,7 @@ function ui.showMessage(text)
     if not messageWidget then
         messageWidget = makeText(root, text, "loading")
         local msgSlot = canvas:AddChildToCanvas(messageWidget)
-        local midX = (PANEL.L + PANEL.R) / 2
-        msgSlot:SetAnchors({ Minimum = { X = midX, Y = PANEL.B - 0.08 }, Maximum = { X = midX, Y = PANEL.B - 0.08 } })
+        msgSlot:SetAnchors({ Minimum = { X = pX(0.5), Y = pY(0.90) }, Maximum = { X = pX(0.5), Y = pY(0.90) } })
         msgSlot:SetAutoSize(true)
         pcall(function() msgSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
     else
@@ -648,21 +637,20 @@ function ui.open(groups, closeCb, onPull, refreshCb)
     buildBackground(root, canvas)
     buildHeader(root, canvas, groups, closeCb)
 
-    -- Search box + refresh button
-    local searchY = PANEL.T + PANEL.HEADER_H + 0.015
-    local searchL = PANEL.L + PANEL.CONTENT_PAD + 0.01
-    local searchR = PANEL.R - PANEL.CONTENT_PAD - 0.01
+    -- Search box + refresh button (panel-relative)
+    local searchY = pY(0.095)
+    local searchL = pX(0.04)
+    local searchR = pX(0.96)
 
     if refreshCb then
-        -- Place refresh button at the right edge, shrink search box to fit
-        searchR = PANEL.R - PANEL.CONTENT_PAD - 0.08
+        searchR = pX(0.85)  -- shrink search to fit refresh button
         local refreshBtn = makeButton(root, "REFRESH", function()
             refreshCb()
         end)
         local refreshSlot = canvas:AddChildToCanvas(refreshBtn)
         refreshSlot:SetAnchors({
-            Minimum = { X = searchR + 0.005, Y = searchY },
-            Maximum = { X = searchR + 0.005, Y = searchY }
+            Minimum = { X = pX(0.86), Y = searchY },
+            Maximum = { X = pX(0.86), Y = searchY }
         })
         refreshSlot:SetAutoSize(true)
     end
