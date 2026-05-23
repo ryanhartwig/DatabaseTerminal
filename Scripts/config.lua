@@ -7,6 +7,12 @@ config.RefreshInterval = 5          -- seconds
 config.Notify = true
 config.SkipLoadingScreen = false    -- skip boot animation, go straight to terminal
 
+-- Dev tools (loaded from dev.txt, not config.txt — not shipped to users)
+config.DevNudge = false
+config.NudgeStartX = 0.5
+config.NudgeStartY = 0.5
+config.PanelCenterX = 0.5  -- horizontal center of the panel (viewport fraction)
+
 local function loadConfig()
     local file = io.open(config.ModDir .. "config.txt", "r")
     if not file then return end
@@ -29,6 +35,30 @@ local function loadConfig()
 end
 
 loadConfig()
+
+-- Dev tools config (gitignored, not shipped)
+local function loadDevConfig()
+    local file = io.open(config.ModDir .. "dev.txt", "r")
+    if not file then return end
+    for line in file:lines() do
+        local key, val = line:match("^(%w+)%s*=%s*(.+)$")
+        if key and val then
+            val = val:match("^%s*(.-)%s*$")
+            if key == "nudge" then
+                config.DevNudge = val == "true" or val == "1"
+            elseif key == "nudge_x" then
+                config.NudgeStartX = tonumber(val) or config.NudgeStartX
+            elseif key == "nudge_y" then
+                config.NudgeStartY = tonumber(val) or config.NudgeStartY
+            elseif key == "panel_center_x" then
+                config.PanelCenterX = tonumber(val) or config.PanelCenterX
+            end
+        end
+    end
+    file:close()
+end
+
+loadDevConfig()
 
 ----------------------------------------------------------------------
 -- SN2ModSettings integration (optional — graceful if not installed)

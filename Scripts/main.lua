@@ -120,3 +120,35 @@ interaction.init({
 })
 
 print("[DBTerminal] Ready.\n")
+
+----------------------------------------------------------------------
+-- DEV: Live nudge tool for UI positioning
+-- Enable via config.txt: dev_nudge = true
+-- Set starting position: nudge_x = 0.5  nudge_y = 0.5
+-- To use: set ui._nudgeSlot in ui.lua on the element you want to move,
+-- open the terminal, then P=left O=right I=up U=down Y=print final values
+----------------------------------------------------------------------
+if config.DevNudge then
+    local nudgeX = config.NudgeStartX or 0.5
+    local nudgeY = config.NudgeStartY or 0.5
+    local function applyNudge()
+        local slot = ui.getNudgeSlot()
+        if not slot then print("[Nudge] No target — set ui._nudgeSlot and open terminal\n") return end
+        ExecuteInGameThread(function()
+            pcall(function()
+                local x = ui.nudgePX(nudgeX)
+                local y = ui.nudgePY(nudgeY)
+                slot:SetAnchors({ Minimum = { X = x, Y = y }, Maximum = { X = x, Y = y } })
+            end)
+            print(string.format("[Nudge] X=%.3f Y=%.3f\n", nudgeX, nudgeY))
+        end)
+    end
+    RegisterKeyBind(Key.P, function() nudgeX = nudgeX - 0.005; applyNudge() end)
+    RegisterKeyBind(Key.O, function() nudgeX = nudgeX + 0.005; applyNudge() end)
+    RegisterKeyBind(Key.I, function() nudgeY = nudgeY - 0.003; applyNudge() end)
+    RegisterKeyBind(Key.U, function() nudgeY = nudgeY + 0.003; applyNudge() end)
+    RegisterKeyBind(Key.Y, function()
+        print(string.format("[Nudge] === FINAL: pX(%.3f), pY(%.3f) ===\n", nudgeX, nudgeY))
+    end)
+    print(string.format("[DBTerminal] Nudge tool active. Start: X=%.3f Y=%.3f\n", nudgeX, nudgeY))
+end

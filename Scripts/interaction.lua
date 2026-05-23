@@ -52,8 +52,9 @@ local function getPanelBounds(pc)
         local maxW = 0.92 * vpW
         if panelW > maxW then panelW = maxW end
         local halfW = (panelW / vpW) / 2
-        L = 0.5 - halfW
-        R = 0.5 + halfW
+        local centerX = config and config.PanelCenterX or 0.5
+        L = centerX - halfW
+        R = centerX + halfW
     end
     return L, R, T, B
 end
@@ -189,7 +190,8 @@ local function showLoadingScreen()
     ver:SetText(FText("Database Terminal v1.0.0"))
     styles.apply(ver, "footer")
     local verSlot = canvas:AddChildToCanvas(ver)
-    verSlot:SetAnchors({ Minimum = { X = lpX(0.06), Y = lpY(0.92) }, Maximum = { X = lpX(0.06), Y = lpY(0.92) } })
+    verSlot:SetAnchors({ Minimum = { X = lpX(0.865), Y = lpY(0.926) }, Maximum = { X = lpX(0.865), Y = lpY(0.926) } })
+    pcall(function() verSlot:SetAlignment({ X = 1.0, Y = 0.5 }) end)  -- right-align
     verSlot:SetAutoSize(true)
 
     ----------------------------------------------------------------

@@ -5,6 +5,7 @@ local UEHelpers = require("UEHelpers")
 local textures = require("textures")
 local styles = require("styles")
 local cats = require("categories")
+local config = require("config")
 local ui = {}
 
 ----------------------------------------------------------------------
@@ -256,8 +257,9 @@ local function computeBounds()
     if panelW > maxW then panelW = maxW end
 
     local halfW = (panelW / vpW) / 2
-    PANEL.L = 0.5 - halfW
-    PANEL.R = 0.5 + halfW
+    local centerX = config and config.PanelCenterX or 0.5
+    PANEL.L = centerX - halfW
+    PANEL.R = centerX + halfW
     PANEL.T = T
     PANEL.B = B
 
@@ -415,8 +417,11 @@ local function buildHeader(root, canvas, groups, closeCb)
     -- Footer version
     local ver = makeText(root, "Database Terminal v1.0.0", "footer")
     local verSlot = canvas:AddChildToCanvas(ver)
-    verSlot:SetAnchors({ Minimum = { X = pX(0.06), Y = pY(0.92) }, Maximum = { X = pX(0.06), Y = pY(0.92) } })
+    verSlot:SetAnchors({ Minimum = { X = pX(0.865), Y = pY(0.926) }, Maximum = { X = pX(0.865), Y = pY(0.926) } })
+    pcall(function() verSlot:SetAlignment({ X = 1.0, Y = 0.5 }) end)  -- right-align
     verSlot:SetAutoSize(true)
+    -- Expose for live nudging (dev tool, remove before release)
+    ui._nudgeSlot = verSlot
 
     -- Alterra glitch logo — top-right, fixed pixel size to prevent stretch
     pcall(function()
@@ -482,6 +487,7 @@ local function buildSidebar(root, canvas)
     -- Buttons placed directly on canvas (VBox constrains their width)
     local startY = 0.15
     local stepY = 0.045  -- spacing between buttons
+    local allGap = 0.025  -- extra gap after "All" button
 
     for i, catDef in ipairs(cats.ALL) do
         local btn = makeButton(root, catDef.label, function()
@@ -489,8 +495,9 @@ local function buildSidebar(root, canvas)
         end)
         if btn then
             categoryButtons[catDef.id] = btn
-            local btnSlot = canvas:AddChildToCanvas(btn)
             local yPos = startY + (i - 1) * stepY
+            if i > 1 then yPos = yPos + allGap end
+            local btnSlot = canvas:AddChildToCanvas(btn)
             btnSlot:SetAnchors({
                 Minimum = { X = pX(0.05), Y = pY(yPos) },
                 Maximum = { X = pX(0.05), Y = pY(yPos) }
@@ -643,6 +650,11 @@ local pullCallback = nil
 function ui.getRoot()
     return root
 end
+
+-- Dev: nudge helpers (remove before release)
+function ui.getNudgeSlot() return ui._nudgeSlot end
+function ui.nudgePX(frac) return pX(frac) end
+function ui.nudgePY(frac) return pY(frac) end
 
 --- Flash a temporary message at the bottom of the panel (auto-fades after 2s)
 local messageWidget = nil
