@@ -391,26 +391,42 @@ local function applyFilters()
 end
 
 --- Toggle a category on/off
-local function toggleCategory(catId)
+--- Regular click = exclusive select, Shift+click = additive toggle
+local function toggleCategory(catId, shiftHeld)
     if catId == "all" then
-        -- Reset to "All" mode
         allActive = true
         activeCategories = {}
-    else
+    elseif shiftHeld then
+        -- Shift+click: additive toggle
         if allActive then
-            -- Switching from All → specific category
             allActive = false
             activeCategories = {}
         end
-        -- Toggle this category
         if activeCategories[catId] then
             activeCategories[catId] = nil
-            -- If nothing is active, revert to All
             if not next(activeCategories) then
                 allActive = true
             end
         else
             activeCategories[catId] = true
+        end
+    else
+        -- Regular click: exclusive select
+        if not allActive and activeCategories[catId] then
+            -- Already active — if it's the only one, revert to All
+            local onlyOne = true
+            for k, _ in pairs(activeCategories) do
+                if k ~= catId then onlyOne = false; break end
+            end
+            if onlyOne then
+                allActive = true
+                activeCategories = {}
+            else
+                activeCategories = { [catId] = true }
+            end
+        else
+            allActive = false
+            activeCategories = { [catId] = true }
         end
     end
     applyFilters()
@@ -487,6 +503,17 @@ function ui.onPullComplete(container, group)
 
 end
 
+--- Check if shift key is currently held
+local function isShiftDown()
+    local held = false
+    pcall(function()
+        local pc = UEHelpers:GetPlayerController()
+        held = pc:IsInputKeyDown({ KeyName = FName("LeftShift") })
+            or pc:IsInputKeyDown({ KeyName = FName("RightShift") })
+    end)
+    return held
+end
+
 --- Build the category sidebar
 local function buildSidebar(root, canvas)
     -- Sidebar vertical box anchored to left side of panel
@@ -494,13 +521,13 @@ local function buildSidebar(root, canvas)
     local sideSlot = canvas:AddChildToCanvas(sideVBox)
     sideSlot:SetAnchors({
         Minimum = { X = pX(0.04), Y = pY(0.15) },
-        Maximum = { X = pX(0.15), Y = pY(0.93) }
+        Maximum = { X = pX(0.165), Y = pY(0.93) }
     })
     sideSlot:SetAutoSize(false)
 
     for _, catDef in ipairs(cats.ALL) do
         local btn = makeButton(root, catDef.label, function()
-            toggleCategory(catDef.id)
+            toggleCategory(catDef.id, isShiftDown())
         end)
         if btn then
             categoryButtons[catDef.id] = btn
