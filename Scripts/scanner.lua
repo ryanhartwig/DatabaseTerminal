@@ -3,6 +3,7 @@
 
 local UEHelpers = require("UEHelpers")
 local scanner = {}
+local categories = require("categories")
 
 ----------------------------------------------------------------------
 -- Container name lookup via UWEItemType (localized)
@@ -165,9 +166,10 @@ function scanner.scan(terminalPos, radiusMeters)
                                     for _, item in ipairs(invItems) do
                                         pcall(function()
                                             local s = item:get()
+                                            local typeName = s.ItemType:GetFName():ToString()
                                             table.insert(items, {
                                                 displayName = s.ItemType.Name:ToString(),
-                                                typeName = s.ItemType:GetFName():ToString(),
+                                                typeName = typeName,
                                                 itemId = s.ItemId,
                                                 inventoryId = invId,
                                                 count = 1,
@@ -176,6 +178,7 @@ function scanner.scan(terminalPos, radiusMeters)
                                                 itemType = s.ItemType,
                                                 containerClass = actorClass,
                                                 sourceClass = source.class,
+                                                category = categories.classify(s.ItemType, typeName),
                                             })
                                         end)
                                     end
@@ -204,6 +207,7 @@ function scanner.group(items)
                 displayName = item.displayName,
                 typeName = item.typeName,
                 itemType = item.itemType,
+                category = item.category,
                 totalCount = 0,
                 containers = {},
             }
