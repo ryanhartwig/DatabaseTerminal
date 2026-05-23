@@ -3,6 +3,7 @@
 
 local UEHelpers = require("UEHelpers")
 local textures = require("textures")
+local styles = require("styles")
 local ui = {}
 
 ----------------------------------------------------------------------
@@ -35,9 +36,10 @@ local function newName(prefix)
     return FName(prefix .. "_" .. widgetCounter)
 end
 
-local function makeText(outer, str)
+local function makeText(outer, str, styleName)
     local tb = StaticConstructObject(classes.text, outer, newName("Txt"))
     if str then tb:SetText(FText(str)) end
+    if styleName then styles.apply(tb, styleName) end
     return tb
 end
 
@@ -183,23 +185,103 @@ local function getContainerItemType(containerClass, sourceClass)
 end
 
 ----------------------------------------------------------------------
--- Panel layout constants
+-- Panel layout — height-driven, aspect-locked
 ----------------------------------------------------------------------
+local DESIGN_W, DESIGN_H = 1536, 972  -- PNG design dimensions
+local DESIGN_RATIO = DESIGN_W / DESIGN_H  -- ~1.58
+local PANEL_HEIGHT = 0.80  -- fraction of viewport height (0.0–1.0, tune this)
+
 local PANEL = {
-    L = 0.10, R = 0.90, T = 0.05, B = 0.95,  -- panel bounds
-    GLOW = 0.008,                                -- outer glow size
-    HEADER_H = 0.065,                            -- header height from top
-    CONTENT_PAD = 0.02,                          -- content inset from panel edges
+    L = 0.10, R = 0.90, T = 0.10, B = 0.90,  -- defaults (overwritten by computeBounds)
+    GLOW = 0.008,
+    HEADER_H = 0.065,
+    CONTENT_PAD = 0.02,
 }
+
+--- Recalculate panel anchors based on viewport dimensions.
+--- Panel always fills 90% of viewport height, width derived from design ratio.
+--- Centered horizontally. Falls back to defaults if viewport can't be read.
+local function computeBounds()
+    local vpW, vpH = 0, 0
+
+    -- Try multiple approaches to get viewport size
+    pcall(function()
+        local pc = UEHelpers:GetPlayerController()
+
+        -- Approach 1: GameViewportClient:GetViewportSize (out param)
+        pcall(function()
+            local vp = pc:GetLocalPlayer():GetViewportClient()
+            local size = { X = 0, Y = 0 }
+            vp:GetViewportSize(size)
+            vpW, vpH = size.X, size.Y
+        end)
+
+        -- Approach 2: WidgetLayoutLibrary if approach 1 failed
+        if vpW <= 0 or vpH <= 0 then
+            pcall(function()
+                local wll = StaticFindObject("/Script/UMG.Default__WidgetLayoutLibrary")
+                local size = wll:GetViewportSize(pc)
+                vpW, vpH = size.X, size.Y
+            end)
+        end
+    end)
+
+    print(string.format("[DBTerminal] Viewport: %dx%d\n", vpW, vpH))
+
+    if vpW <= 0 or vpH <= 0 then return end  -- keep defaults
+
+    local halfH = PANEL_HEIGHT / 2
+    local T, B = 0.5 - halfH, 0.5 + halfH    -- centered vertically
+    local panelH = PANEL_HEIGHT * vpH          -- panel height in pixels
+    local panelW = panelH * DESIGN_RATIO       -- width to match design ratio
+    local maxW = 0.92 * vpW                    -- never exceed 92% of viewport width
+    if panelW > maxW then panelW = maxW end
+
+    local halfW = (panelW / vpW) / 2
+    PANEL.L = 0.5 - halfW
+    PANEL.R = 0.5 + halfW
+    PANEL.T = T
+    PANEL.B = B
+
+    print(string.format("[DBTerminal] Panel bounds: L=%.3f R=%.3f (width=%.1f%%)\n",
+        PANEL.L, PANEL.R, (PANEL.R - PANEL.L) * 100))
+end
+
+----------------------------------------------------------------------
+-- Animated material overlays
+----------------------------------------------------------------------
+
+--- Try to apply a game material to an Image widget.
+--- Materials may not be loaded until the relevant game screen is opened.
+--- Returns the Image widget if successful, nil otherwise.
+local function applyMaterial(root, canvas, name, matPath, x1, y1, x2, y2, opacity)
+    local mat = StaticFindObject(matPath)
+    if not mat then return nil end
+
+    local img = StaticConstructObject(classes.img, root, newName(name))
+    local ok = pcall(function() img:SetBrushFromMaterial(mat) end)
+    if not ok then return nil end
+
+    if opacity then
+        pcall(function() img:SetRenderOpacity(opacity) end)
+    end
+
+    local slot = canvas:AddChildToCanvas(img)
+    slot:SetAnchors({ Minimum = { X = x1, Y = y1 }, Maximum = { X = x2, Y = y2 } })
+    slot:SetAutoSize(false)
+    return img
+end
 
 ----------------------------------------------------------------------
 -- Background rendering
 ----------------------------------------------------------------------
+local NUM_HEX_BANDS = 8
+
 local function buildBackground(root, canvas)
     local L, R, T, B = PANEL.L, PANEL.R, PANEL.T, PANEL.B
     local G = PANEL.GLOW
 
-    -- Try custom texture background first
+    -- Background with hex grid baked in
     local bgTex = textures.get("Background")
     if bgTex then
         local bg = StaticConstructObject(classes.img, root, newName("BG"))
@@ -258,18 +340,27 @@ local function buildBackground(root, canvas)
 end
 
 ----------------------------------------------------------------------
+-- Content area (ScrollBox with item groups)
+----------------------------------------------------------------------
+
+-- Widget references for live updates (declared before buildHeader so
+-- both buildHeader and updateStatsText share the same local)
+local statsWidget = nil
+local groupWidgets = {}  -- { groupBox, countText, subRows: { subRow, countText, container, group } }
+
+----------------------------------------------------------------------
 -- Header bar
 ----------------------------------------------------------------------
 local function buildHeader(root, canvas, groups, closeCb)
     local L, R, T = PANEL.L, PANEL.R, PANEL.T
 
     -- Title
-    local title = makeText(root, "DATABASE TERMINAL")
+    local title = makeText(root, "DATABASE TERMINAL", "title")
     local titleSlot = canvas:AddChildToCanvas(title)
-    titleSlot:SetAnchors({ Minimum = { X = L+0.025, Y = T+0.018 }, Maximum = { X = L+0.025, Y = T+0.018 } })
+    titleSlot:SetAnchors({ Minimum = { X = L+0.025, Y = T+0.028 }, Maximum = { X = L+0.025, Y = T+0.028 } })
     titleSlot:SetAutoSize(true)
 
-    -- Stats
+    -- Stats summary
     local totalItems = 0
     local totalContainers = 0
     for _, group in ipairs(groups) do
@@ -277,10 +368,10 @@ local function buildHeader(root, canvas, groups, closeCb)
         totalContainers = totalContainers + #group.containerList
     end
 
-    local statsStr = string.format("%d items | %d containers", totalItems, totalContainers)
-    statsWidget = makeText(root, statsStr)
+    local statsStr = string.format("%d items  |  %d containers", totalItems, totalContainers)
+    statsWidget = makeText(root, statsStr, "stats")
     local statsSlot = canvas:AddChildToCanvas(statsWidget)
-    statsSlot:SetAnchors({ Minimum = { X = R-0.22, Y = T+0.018 }, Maximum = { X = R-0.22, Y = T+0.018 } })
+    statsSlot:SetAnchors({ Minimum = { X = R-0.18, Y = T+0.030 }, Maximum = { X = R-0.18, Y = T+0.030 } })
     statsSlot:SetAutoSize(true)
 
     -- Close button [X]
@@ -292,19 +383,16 @@ local function buildHeader(root, canvas, groups, closeCb)
     closeBtnSlot:SetAutoSize(true)
 
     -- Footer version
-    local ver = makeText(root, "Database Terminal v0.1.0")
+    local ver = makeText(root, "Database Terminal v0.1.0", "footer")
     local verSlot = canvas:AddChildToCanvas(ver)
-    verSlot:SetAnchors({ Minimum = { X = L+0.025, Y = PANEL.B-0.035 }, Maximum = { X = L+0.025, Y = PANEL.B-0.035 } })
+    verSlot:SetAnchors({ Minimum = { X = L+0.04, Y = PANEL.B-0.055 }, Maximum = { X = L+0.04, Y = PANEL.B-0.055 } })
     verSlot:SetAutoSize(true)
+
+    -- Alterra glitch logo — top-right area, always animating
+    applyMaterial(root, canvas, "AlterraLogo",
+        "/Game/UI/Materials_test/Glitch/M_Glitch.M_Glitch",
+        R - 0.12, T + 0.015, R - 0.03, T + 0.065, 0.8)
 end
-
-----------------------------------------------------------------------
--- Content area (ScrollBox with item groups)
-----------------------------------------------------------------------
-
--- Widget references for live updates
-local statsWidget = nil
-local groupWidgets = {}  -- { groupBox, countText, subRows: { subRow, countText, container, group } }
 
 local function updateStatsText()
     if not statsWidget or not scanGroups then return end
@@ -315,7 +403,7 @@ local function updateStatsText()
         totalContainers = totalContainers + #group.containerList
     end
     pcall(function()
-        statsWidget:SetText(FText(string.format("%d items | %d containers", totalItems, totalContainers)))
+        statsWidget:SetText(FText(string.format("%d items  |  %d containers", totalItems, totalContainers)))
     end)
 end
 
@@ -374,7 +462,7 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
 
     -- Empty state
     if #groups == 0 then
-        local emptyText = makeText(root, "No items found in nearby containers.")
+        local emptyText = makeText(root, "No items found in nearby containers.", "empty")
         scrollBox:AddChild(emptyText)
         return
     end
@@ -399,8 +487,9 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         local iconGap = makeSizeBox(root, 8, 1)
         itemHeader:AddChildToHorizontalBox(iconGap)
 
-        local nameText = makeText(root, group.displayName)
-        itemHeader:AddChildToHorizontalBox(nameText)
+        local nameText = makeText(root, group.displayName, "itemName")
+        local nameSlot = itemHeader:AddChildToHorizontalBox(nameText)
+        pcall(function() nameSlot:SetVerticalAlignment(1) end)  -- VAlign_Center
 
         -- Fill spacer pushes count to the right
         local headerSpacer = StaticConstructObject(classes.sizeBox, root, newName("Spacer"))
@@ -408,8 +497,9 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         local headerSpacerSlot = itemHeader:AddChildToHorizontalBox(headerSpacer)
         pcall(function() headerSpacerSlot:SetSize({ SizeRule = 1, Value = 1.0 }) end)
 
-        local countText = makeText(root, "x" .. group.totalCount)
-        itemHeader:AddChildToHorizontalBox(countText)
+        local countText = makeText(root, "x" .. group.totalCount, "count")
+        local countSlot = itemHeader:AddChildToHorizontalBox(countText)
+        pcall(function() countSlot:SetVerticalAlignment(1) end)  -- VAlign_Center
         gw.countText = countText
 
         groupBox:AddChildToVerticalBox(itemHeader)
@@ -418,22 +508,22 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
         for _, container in ipairs(group.containerList) do
             local subRow = makeHBox(root)
 
-            -- Indentation
-            local indent = makeSizeBox(root, 28, 1)
+            -- Indentation (increased for visual hierarchy)
+            local indent = makeSizeBox(root, 56, 1)
             subRow:AddChildToHorizontalBox(indent)
 
-            -- Container type icon (uses same TSoftObjectPtr pattern as item thumbnails)
+            -- Container type icon (dimmed to let material icons stand out)
             local containerIcon = makeImage(root)
             local containerType = getContainerItemType(container.containerClass, container.sourceClass)
             if containerType then
                 pcall(function()
                     containerIcon:SetBrushFromSoftTexture(containerType.Thumbnail, false)
                     containerIcon:SetDesiredSizeOverride({ X = 28, Y = 28 })
+                    containerIcon:SetRenderOpacity(0.5)
                 end)
             end
             local cIconSize = StaticConstructObject(classes.sizeBox, root, newName("CISize"))
             pcall(function() cIconSize:SetWidthOverride(36) end)
-            -- Note: SetHeightOverride has no effect in HBox — height is set by row
             pcall(function() cIconSize:SetContent(containerIcon) end)
             subRow:AddChildToHorizontalBox(cIconSize)
 
@@ -441,8 +531,9 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             local iconGap = makeSizeBox(root, 6, 1)
             subRow:AddChildToHorizontalBox(iconGap)
 
-            local labelText = makeText(root, container.label)
-            subRow:AddChildToHorizontalBox(labelText)
+            local labelText = makeText(root, container.label, "container")
+            local labelSlot = subRow:AddChildToHorizontalBox(labelText)
+            pcall(function() labelSlot:SetVerticalAlignment(1) end)  -- VAlign_Center
 
             -- Fill spacer pushes count + button to the right
             local spacer = StaticConstructObject(classes.sizeBox, root, newName("Spacer"))
@@ -450,14 +541,16 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             local spacerSlot = subRow:AddChildToHorizontalBox(spacer)
             pcall(function() spacerSlot:SetSize({ SizeRule = 1, Value = 1.0 }) end)
 
-            local subCount = makeText(root, "x" .. container.count .. "  ")
-            subRow:AddChildToHorizontalBox(subCount)
+            local subCount = makeText(root, "x" .. container.count .. "  ", "countSub")
+            local subCountSlot = subRow:AddChildToHorizontalBox(subCount)
+            pcall(function() subCountSlot:SetVerticalAlignment(1) end)  -- VAlign_Center
 
             local pullBtn = makeButton(root, "PULL", function()
                 if pullCallback and #container.items > 0 then
                     pullCallback(container, container.items[1], group)
                 end
             end)
+            pcall(function() pullBtn:SetRenderScale({ X = 0.8, Y = 0.8 }) end)
             subRow:AddChildToHorizontalBox(pullBtn)
 
             groupBox:AddChildToVerticalBox(subRow)
@@ -511,6 +604,8 @@ function ui.open(groups, closeCb, onPull)
     -- Textures are reimported fresh by interaction.lua before each open
     -- (UE GC can free unrooted UTexture2Ds between interactions)
 
+    computeBounds()   -- recalculate PANEL anchors for current viewport size
+    styles.captureGameFont()  -- grab game font asset for styled text
     registerButtonHook()
 
     scanGroups = groups
@@ -534,13 +629,27 @@ function ui.open(groups, closeCb, onPull)
     buildBackground(root, canvas)
     buildHeader(root, canvas, groups, closeCb)
 
-    -- Search box
+    -- Search box with animated material background
+    local searchY = PANEL.T + PANEL.HEADER_H + 0.005
+    local searchL = PANEL.L + PANEL.CONTENT_PAD + 0.01
+    local searchR = PANEL.R - PANEL.CONTENT_PAD - 0.01
+
     local searchBox = StaticConstructObject(classes.editText, root, FName("SearchBox"))
     pcall(function() searchBox:SetText(FText("")) end)
+    pcall(function() searchBox:SetHintText(FText("Search items...")) end)
+    pcall(function() searchBox:SetForegroundColor({ R=0.8, G=0.9, B=1.0, A=1.0 }) end)
+    -- Make the default gray background transparent
+    pcall(function() searchBox:SetRenderOpacity(0.8) end)
+    pcall(function()
+        local style = searchBox.WidgetStyle
+        style.BackgroundImageNormal.TintColor = { SpecifiedColor = { R=0, G=0, B=0, A=0 } }
+        style.BackgroundImageHovered.TintColor = { SpecifiedColor = { R=0.1, G=0.3, B=0.5, A=0.3 } }
+        style.BackgroundImageFocused.TintColor = { SpecifiedColor = { R=0.1, G=0.4, B=0.6, A=0.4 } }
+    end)
     local searchSlot = canvas:AddChildToCanvas(searchBox)
     searchSlot:SetAnchors({
-        Minimum = { X = PANEL.L + PANEL.CONTENT_PAD + 0.01, Y = PANEL.T + PANEL.HEADER_H + 0.005 },
-        Maximum = { X = PANEL.R - PANEL.CONTENT_PAD - 0.01, Y = PANEL.T + PANEL.HEADER_H + 0.005 }
+        Minimum = { X = searchL, Y = searchY },
+        Maximum = { X = searchR, Y = searchY }
     })
     searchSlot:SetAutoSize(true)
 
@@ -573,8 +682,6 @@ function ui.open(groups, closeCb, onPull)
 
     -- Show at high z-order
     root:AddToViewport(500)
-    -- Close via ESC/F6 keybinds in interaction.lua (no NoA widget polling needed
-    -- since CloseUI() prevents the NoA widget from ever opening)
 end
 
 function ui.close()

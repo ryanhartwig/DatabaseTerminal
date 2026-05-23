@@ -45,8 +45,8 @@ function scanner.scan(terminalPos, radiusMeters)
         { class = "SN2Locker",                       getInv = function(a) return a.Inventory end,            labelFn = getLockerLabel },
         -- Portable/floating lockers
         { class = "BP_FloatingLocker_Carryable_C",   getInv = function(a) return a.UWEInventory end,         labelFn = function() return "Portable Locker" end },
-        -- Tailing chests
-        { class = "BP_Tailing_Chest_C",              getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Tailing Chest" end },
+        -- Tailing chests (try Inventory first like SN2Locker, fall back to InventoryComponent)
+        { class = "BP_Tailing_Chest_C",              getInv = function(a) return a.Inventory or a.InventoryComponent end, labelFn = function() return "Tailing Chest" end },
         -- Chargers
         { class = "BP_BasicBatteryTerminal_C",       getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Battery Charger" end },
         { class = "BP_PowerCellTerminal_C",          getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Power Cell Charger" end },
