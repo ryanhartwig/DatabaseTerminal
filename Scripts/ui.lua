@@ -241,10 +241,10 @@ local function computeBounds()
     if vpW <= 0 or vpH <= 0 then return end  -- keep defaults
 
     local halfH = PANEL_HEIGHT / 2
-    local T, B = 0.5 - halfH, 0.5 + halfH    -- centered vertically
-    local panelH = PANEL_HEIGHT * vpH          -- panel height in pixels
-    local panelW = panelH * DESIGN_RATIO       -- width to match design ratio
-    local maxW = 0.92 * vpW                    -- never exceed 92% of viewport width
+    local T, B = 0.5 - halfH, 0.5 + halfH
+    local panelH = PANEL_HEIGHT * vpH
+    local panelW = panelH * DESIGN_RATIO
+    local maxW = 0.92 * vpW
     if panelW > maxW then panelW = maxW end
 
     local halfW = (panelW / vpW) / 2
@@ -648,23 +648,24 @@ function ui.open(groups, closeCb, onPull, refreshCb)
     buildBackground(root, canvas)
     buildHeader(root, canvas, groups, closeCb)
 
-    -- Refresh button (top-right of content area)
+    -- Search box + refresh button
+    local searchY = PANEL.T + PANEL.HEADER_H + 0.015
+    local searchL = PANEL.L + PANEL.CONTENT_PAD + 0.01
+    local searchR = PANEL.R - PANEL.CONTENT_PAD - 0.01
+
     if refreshCb then
+        -- Place refresh button at the right edge, shrink search box to fit
+        searchR = PANEL.R - PANEL.CONTENT_PAD - 0.08
         local refreshBtn = makeButton(root, "REFRESH", function()
             refreshCb()
         end)
         local refreshSlot = canvas:AddChildToCanvas(refreshBtn)
         refreshSlot:SetAnchors({
-            Minimum = { X = PANEL.R - PANEL.CONTENT_PAD - 0.12, Y = PANEL.T + PANEL.HEADER_H + 0.015 },
-            Maximum = { X = PANEL.R - PANEL.CONTENT_PAD - 0.12, Y = PANEL.T + PANEL.HEADER_H + 0.015 }
+            Minimum = { X = searchR + 0.005, Y = searchY },
+            Maximum = { X = searchR + 0.005, Y = searchY }
         })
         refreshSlot:SetAutoSize(true)
     end
-
-    -- Search box
-    local searchY = PANEL.T + PANEL.HEADER_H + 0.015
-    local searchL = PANEL.L + PANEL.CONTENT_PAD + 0.01
-    local searchR = PANEL.R - PANEL.CONTENT_PAD - 0.08  -- leave room for refresh button
 
     local searchBox = StaticConstructObject(classes.editText, root, FName("SearchBox"))
     pcall(function() searchBox:SetText(FText("")) end)
