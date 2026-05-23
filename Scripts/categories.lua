@@ -1,5 +1,5 @@
 -- DatabaseTerminal: Item category classification
--- Classifies items using TypeTag (primary) + name pattern fallback
+-- Classifies items using name patterns (consumables) then TypeTag fallback
 
 local categories = {}
 
@@ -13,7 +13,7 @@ categories.ALL = {
     { id = "fauna",     label = "Fauna" },
     { id = "gear",      label = "Gear" },
     { id = "power",     label = "Power" },
-    { id = "food",      label = "Food" },
+    { id = "food",      label = "Food & Drink" },
     { id = "medical",   label = "Medical" },
     { id = "materials", label = "Materials" },
 }
@@ -59,7 +59,15 @@ end
 --- @param typeName string FName of the item type (e.g. "DA_Glass_ItemType")
 --- @return string category id
 function categories.classify(itemType, typeName)
-    -- 1. Check TypeTag first
+    local lname = string.lower(typeName or "")
+
+    -- 1. Consumable name patterns first — cooked fish have TypeTag=Fauna
+    --    but should classify as food, not fauna
+    if matchesAny(lname, FOOD_PATTERNS) then return "food" end
+    if matchesAny(lname, DRINK_PATTERNS) then return "food" end
+    if matchesAny(lname, HEAL_PATTERNS) then return "medical" end
+
+    -- 2. TypeTag mapping
     if itemType then
         local tagStr = nil
         pcall(function()
@@ -72,25 +80,12 @@ function categories.classify(itemType, typeName)
                 end
             end
         end
-    end
 
-    -- 2. Name-based fallback for TypeTag = None items
-    local lname = string.lower(typeName or "")
-
-    -- Food & drink → "food"
-    if matchesAny(lname, FOOD_PATTERNS) then return "food" end
-    if matchesAny(lname, DRINK_PATTERNS) then return "food" end
-
-    -- Medical
-    if matchesAny(lname, HEAL_PATTERNS) then return "medical" end
-
-    -- Tool flag
-    if itemType then
+        -- 3. Tool/equipment flags
         local isTool = false
         pcall(function() isTool = itemType.bTool end)
         if isTool then return "gear" end
 
-        -- EquipmentSlot check
         local slotStr = nil
         pcall(function() slotStr = itemType.EquipmentSlot.TagName:ToString() end)
         if slotStr and slotStr ~= "" and slotStr ~= "None" then
@@ -98,7 +93,7 @@ function categories.classify(itemType, typeName)
         end
     end
 
-    -- Fallback
+    -- 4. Fallback
     return "materials"
 end
 

@@ -493,8 +493,8 @@ local function buildSidebar(root, canvas)
     local sideVBox = makeVBox(root)
     local sideSlot = canvas:AddChildToCanvas(sideVBox)
     sideSlot:SetAnchors({
-        Minimum = { X = pX(0.03), Y = pY(0.15) },
-        Maximum = { X = pX(0.17), Y = pY(0.93) }
+        Minimum = { X = pX(0.04), Y = pY(0.15) },
+        Maximum = { X = pX(0.15), Y = pY(0.93) }
     })
     sideSlot:SetAutoSize(false)
 
@@ -521,7 +521,7 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
     -- Position scrollbox (all panel-relative)
     local scrollSlot = canvas:AddChildToCanvas(scrollBox)
     scrollSlot:SetAnchors({
-        Minimum = { X = pX(0.19), Y = pY(0.15) },
+        Minimum = { X = pX(0.17), Y = pY(0.15) },
         Maximum = { X = pX(0.96), Y = pY(0.93) }
     })
     scrollSlot:SetAutoSize(false)
@@ -727,7 +727,7 @@ function ui.open(groups, closeCb, onPull, refreshCb)
 
     -- Search box + refresh button (panel-relative)
     local searchY = pY(0.095)
-    local searchL = pX(0.19)
+    local searchL = pX(0.17)
     local searchR = pX(0.96)
 
     if refreshCb then
