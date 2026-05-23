@@ -505,7 +505,6 @@ end
 
 ----------------------------------------------------------------------
 -- Shift+click tracking (for category multi-select)
--- Uses ModifierKey.SHIFT with mouse button keybind (proven UE4SS API)
 ----------------------------------------------------------------------
 local shiftHeld = false
 local shiftTrackingSetup = false
@@ -514,39 +513,27 @@ local function setupShiftTracking()
     if shiftTrackingSetup then return end
     shiftTrackingSetup = true
 
-    -- Find the left mouse button key constant
-    local mouseKey = nil
-    local mouseName = nil
-    for _, name in ipairs({"LEFT_MOUSE_BUTTON", "LeftMouseButton", "MOUSE_LEFT", "LMB"}) do
-        if Key[name] then
-            mouseKey = Key[name]
-            mouseName = name
-            break
-        end
-    end
-
-    if not mouseKey then
-        -- Dump mouse-related Key entries for debugging
-        print("[DBTerminal] No mouse key found. Dumping Key entries with 'mouse':\n")
-        for k, v in pairs(Key) do
-            if string.find(string.lower(k), "mouse") then
-                print(string.format("[DBTerminal]   Key.%s = %s\n", k, tostring(v)))
-            end
-        end
-        return
-    end
-
-    -- SHIFT+LMB sets flag; HandleButtonClicked fires in same frame and reads it
-    pcall(function()
-        RegisterKeyBind(mouseKey, {ModifierKey.SHIFT}, function()
-            shiftHeld = true
-            -- Auto-reset after short delay (HandleButtonClicked fires first)
-            ExecuteWithDelay(100, function()
-                ExecuteInGameThread(function() shiftHeld = false end)
+    -- UE4SS Key table lacks shift entries, try raw VK codes
+    -- VK_LSHIFT=160, VK_RSHIFT=161, VK_SHIFT=16
+    local registered = false
+    for _, vk in ipairs({160, 161, 16}) do
+        local ok = pcall(function()
+            RegisterKeyBind(vk, function()
+                shiftHeld = true
+                ExecuteWithDelay(500, function()
+                    ExecuteInGameThread(function() shiftHeld = false end)
+                end)
             end)
         end)
-        print(string.format("[DBTerminal] Shift+click tracking registered via Key.%s + ModifierKey.SHIFT\n", mouseName))
-    end)
+        if ok then
+            registered = true
+            print(string.format("[DBTerminal] Shift tracking registered (VK=%d)\n", vk))
+        end
+    end
+
+    if not registered then
+        print("[DBTerminal] Shift tracking failed — multi-select unavailable\n")
+    end
 end
 
 --- Build the category sidebar
