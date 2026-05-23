@@ -504,7 +504,8 @@ function ui.onPullComplete(container, group)
 end
 
 ----------------------------------------------------------------------
--- Shift key tracking (for category multi-select)
+-- Shift+click tracking (for category multi-select)
+-- Uses ModifierKey.SHIFT with mouse button keybind (proven UE4SS API)
 ----------------------------------------------------------------------
 local shiftHeld = false
 local shiftTrackingSetup = false
@@ -513,48 +514,39 @@ local function setupShiftTracking()
     if shiftTrackingSetup then return end
     shiftTrackingSetup = true
 
-    -- Probe Key table for shift key constant name
-    local shiftKey = nil
-    for _, name in ipairs({"LEFT_SHIFT", "LSHIFT", "LeftShift", "SHIFT", "Shift"}) do
+    -- Find the left mouse button key constant
+    local mouseKey = nil
+    local mouseName = nil
+    for _, name in ipairs({"LEFT_MOUSE_BUTTON", "LeftMouseButton", "MOUSE_LEFT", "LMB"}) do
         if Key[name] then
-            shiftKey = Key[name]
-            print(string.format("[DBTerminal] Found shift key: Key.%s\n", name))
+            mouseKey = Key[name]
+            mouseName = name
             break
         end
     end
 
-    if not shiftKey then
-        -- Dump all Key entries containing "shift" for debugging
-        print("[DBTerminal] No shift key constant found. Available keys with 'shift':\n")
+    if not mouseKey then
+        -- Dump mouse-related Key entries for debugging
+        print("[DBTerminal] No mouse key found. Dumping Key entries with 'mouse':\n")
         for k, v in pairs(Key) do
-            if string.find(string.lower(k), "shift") then
+            if string.find(string.lower(k), "mouse") then
                 print(string.format("[DBTerminal]   Key.%s = %s\n", k, tostring(v)))
             end
         end
         return
     end
 
-    -- Try press/release form: RegisterKeyBind(key, {onPress, onRelease})
-    local ok = pcall(function()
-        RegisterKeyBind(shiftKey, {
-            function() shiftHeld = true end,
-            function() shiftHeld = false end
-        })
-        print("[DBTerminal] Shift tracking: press/release registered\n")
-    end)
-
-    if not ok then
-        -- Fallback: press-only with auto-reset
-        pcall(function()
-            RegisterKeyBind(shiftKey, function()
-                shiftHeld = true
-                ExecuteWithDelay(400, function()
-                    ExecuteInGameThread(function() shiftHeld = false end)
-                end)
+    -- SHIFT+LMB sets flag; HandleButtonClicked fires in same frame and reads it
+    pcall(function()
+        RegisterKeyBind(mouseKey, {ModifierKey.SHIFT}, function()
+            shiftHeld = true
+            -- Auto-reset after short delay (HandleButtonClicked fires first)
+            ExecuteWithDelay(100, function()
+                ExecuteInGameThread(function() shiftHeld = false end)
             end)
-            print("[DBTerminal] Shift tracking: press-only with auto-reset\n")
         end)
-    end
+        print(string.format("[DBTerminal] Shift+click tracking registered via Key.%s + ModifierKey.SHIFT\n", mouseName))
+    end)
 end
 
 --- Build the category sidebar
