@@ -498,6 +498,7 @@ local function buildSidebar(root, canvas)
             pcall(function()
                 btnSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
             end)
+            pcall(function() btnSlot:SetHorizontalAlignment(3) end) -- HAlign_Fill
         end
     end
 
