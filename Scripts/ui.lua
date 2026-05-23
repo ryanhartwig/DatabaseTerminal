@@ -343,9 +343,7 @@ end
 -- Content area (ScrollBox with item groups)
 ----------------------------------------------------------------------
 
--- Widget references for live updates (declared before buildHeader so
--- both buildHeader and updateStatsText share the same local)
-local statsWidget = nil
+-- Widget references for live updates
 local groupWidgets = {}  -- { groupBox, countText, subRows: { subRow, countText, container, group } }
 
 ----------------------------------------------------------------------
@@ -357,22 +355,8 @@ local function buildHeader(root, canvas, groups, closeCb)
     -- Title
     local title = makeText(root, "DATABASE TERMINAL", "title")
     local titleSlot = canvas:AddChildToCanvas(title)
-    titleSlot:SetAnchors({ Minimum = { X = L+0.025, Y = T+0.028 }, Maximum = { X = L+0.025, Y = T+0.028 } })
+    titleSlot:SetAnchors({ Minimum = { X = L+0.035, Y = T+0.035 }, Maximum = { X = L+0.035, Y = T+0.035 } })
     titleSlot:SetAutoSize(true)
-
-    -- Stats summary
-    local totalItems = 0
-    local totalContainers = 0
-    for _, group in ipairs(groups) do
-        totalItems = totalItems + group.totalCount
-        totalContainers = totalContainers + #group.containerList
-    end
-
-    local statsStr = string.format("%d items  |  %d containers", totalItems, totalContainers)
-    statsWidget = makeText(root, statsStr, "stats")
-    local statsSlot = canvas:AddChildToCanvas(statsWidget)
-    statsSlot:SetAnchors({ Minimum = { X = R-0.18, Y = T+0.030 }, Maximum = { X = R-0.18, Y = T+0.030 } })
-    statsSlot:SetAutoSize(true)
 
     -- Close button [X]
     local closeBtn = makeButton(root, "X", function()
@@ -385,27 +369,15 @@ local function buildHeader(root, canvas, groups, closeCb)
     -- Footer version
     local ver = makeText(root, "Database Terminal v0.1.0", "footer")
     local verSlot = canvas:AddChildToCanvas(ver)
-    verSlot:SetAnchors({ Minimum = { X = L+0.04, Y = PANEL.B-0.055 }, Maximum = { X = L+0.04, Y = PANEL.B-0.055 } })
+    verSlot:SetAnchors({ Minimum = { X = L+0.05, Y = PANEL.B-0.065 }, Maximum = { X = L+0.05, Y = PANEL.B-0.065 } })
     verSlot:SetAutoSize(true)
 
     -- Alterra glitch logo — top-right area, always animating
     applyMaterial(root, canvas, "AlterraLogo",
         "/Game/UI/Materials_test/Glitch/M_Glitch.M_Glitch",
-        R - 0.12, T + 0.015, R - 0.03, T + 0.065, 0.8)
+        R - 0.12, T + 0.025, R - 0.03, T + 0.095, 0.8)
 end
 
-local function updateStatsText()
-    if not statsWidget or not scanGroups then return end
-    local totalItems = 0
-    local totalContainers = 0
-    for _, group in ipairs(scanGroups) do
-        totalItems = totalItems + group.totalCount
-        totalContainers = totalContainers + #group.containerList
-    end
-    pcall(function()
-        statsWidget:SetText(FText(string.format("%d items  |  %d containers", totalItems, totalContainers)))
-    end)
-end
 
 --- Called after a successful pull — update counts and hide empty rows
 function ui.onPullComplete(container, group)
@@ -443,8 +415,6 @@ function ui.onPullComplete(container, group)
         end
     end
 
-    -- Update header stats
-    updateStatsText()
 end
 
 local function buildContent(root, canvas, scrollBox, groups, pullCallback)
@@ -687,7 +657,6 @@ end
 function ui.close()
     buttonActions = {}
     groupWidgets = {}
-    statsWidget = nil
 
     if root then
         pcall(function() root:RemoveFromViewport() end)

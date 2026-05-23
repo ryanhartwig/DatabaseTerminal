@@ -57,6 +57,26 @@ local function getPanelBounds(pc)
 end
 
 local loadingAlive = false  -- flag for LoopAsync animation teardown
+
+-- Visual center correction — midX/midY from getPanelBounds is mathematically
+-- correct but appears offset against the background art on screen.
+local CENTER_NUDGE_X = -0.026
+local CENTER_NUDGE_Y = -0.024
+
+--- Try to apply a game material to an Image widget (graceful no-op if not loaded)
+local function applyMaterial(root, canvas, name, matPath, x1, y1, x2, y2, opacity)
+    local mat = StaticFindObject(matPath)
+    if not mat then return nil end
+    local imgCls = StaticFindObject("/Script/UMG.Image")
+    local img = StaticConstructObject(imgCls, root, FName(name))
+    local ok = pcall(function() img:SetBrushFromMaterial(mat) end)
+    if not ok then return nil end
+    if opacity then pcall(function() img:SetRenderOpacity(opacity) end) end
+    local slot = canvas:AddChildToCanvas(img)
+    slot:SetAnchors({ Minimum = { X = x1, Y = y1 }, Maximum = { X = x2, Y = y2 } })
+    slot:SetAutoSize(false)
+    return img
+end
 local NUM_RINGS = 7
 local NUM_HEX_BANDS = 8
 local HEX_STAGGER = 80  -- ms between each hex band appearing
@@ -87,8 +107,8 @@ local function showLoadingScreen()
     root.WidgetTree.RootWidget = canvas
 
     local L, R, T, B = getPanelBounds(pc)
-    local midX = (L + R) / 2
-    local midY = (T + B) / 2
+    local midX = (L + R) / 2 + CENTER_NUDGE_X
+    local midY = (T + B) / 2 + CENTER_NUDGE_Y
 
     -- Background (with hex grid baked in)
     local bgTex = textures.get("Background")
@@ -141,29 +161,49 @@ local function showLoadingScreen()
     end
 
     ----------------------------------------------------------------
-    -- "Scanning containers" + animated dots
+    -- Shared chrome (same positions as main UI)
+    ----------------------------------------------------------------
+    local sizeBoxCls = StaticFindObject("/Script/UMG.SizeBox")
+
+    -- Title header
+    local title = StaticConstructObject(textCls, root, FName("LoadTitle"))
+    title:SetText(FText("DATABASE TERMINAL"))
+    styles.apply(title, "title")
+    local titleSlot = canvas:AddChildToCanvas(title)
+    titleSlot:SetAnchors({ Minimum = { X = L+0.035, Y = T+0.035 }, Maximum = { X = L+0.035, Y = T+0.035 } })
+    titleSlot:SetAutoSize(true)
+
+    -- Footer version
+    local ver = StaticConstructObject(textCls, root, FName("LoadVer"))
+    ver:SetText(FText("Database Terminal v0.1.0"))
+    styles.apply(ver, "footer")
+    local verSlot = canvas:AddChildToCanvas(ver)
+    verSlot:SetAnchors({ Minimum = { X = L+0.05, Y = B-0.065 }, Maximum = { X = L+0.05, Y = B-0.065 } })
+    verSlot:SetAutoSize(true)
+
+    ----------------------------------------------------------------
+    -- "Scanning containers..." — single centered text, terminal flicker
     ----------------------------------------------------------------
     local label = StaticConstructObject(textCls, root, FName("LoadLabel"))
-    label:SetText(FText("Scanning containers"))
-    styles.apply(label, "loading")
+    label:SetText(FText("Scanning containers..."))
+    styles.apply(label, "loadingSub")
     local labelSlot = canvas:AddChildToCanvas(label)
-    labelSlot:SetAnchors({ Minimum = { X = midX, Y = midY + 0.14 }, Maximum = { X = midX, Y = midY + 0.14 } })
+    labelSlot:SetAnchors({ Minimum = { X = midX, Y = midY + 0.16 }, Maximum = { X = midX, Y = midY + 0.16 } })
     labelSlot:SetAutoSize(true)
-    pcall(function() labelSlot:SetAlignment({ X = 1.0, Y = 0.5 }) end)
+    pcall(function() labelSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
 
-    local dots = StaticConstructObject(textCls, root, FName("LoadDots"))
-    dots:SetText(FText(""))
-    styles.apply(dots, "loading")
-    local dotsSlot = canvas:AddChildToCanvas(dots)
-    dotsSlot:SetAnchors({ Minimum = { X = midX, Y = midY + 0.14 }, Maximum = { X = midX, Y = midY + 0.14 } })
-    dotsSlot:SetAutoSize(true)
-    pcall(function() dotsSlot:SetAlignment({ X = 0, Y = 0.5 }) end)
+    -- Alterra logo — offset +0.025 from midX to align with text visual center
+    local logoNudge = 0.025
+    applyMaterial(root, canvas, "AlterraLogo",
+        "/Game/UI/Materials_test/Glitch/M_Glitch.M_Glitch",
+        midX + logoNudge - 0.045, midY + 0.20, midX + logoNudge + 0.045, midY + 0.27, 0.8)
 
-    local dotPhase = 0
-    LoopAsync(300, function()
+    -- Subtle terminal-style opacity jitter on the scanning text
+    LoopAsync(120, function()
         if not loadingAlive then return true end
-        dotPhase = (dotPhase % 3) + 1
-        pcall(function() dots:SetText(FText(string.rep(".", dotPhase))) end)
+        -- Base opacity is 0.4 (from style). Jitter mostly near base with occasional dips.
+        local jitter = 0.30 + math.random() * 0.10
+        pcall(function() label:SetOpacity(jitter) end)
         return false
     end)
 

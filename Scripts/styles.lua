@@ -20,8 +20,8 @@ local styles = {}
 ----------------------------------------------------------------------
 styles.defs = {
     title = {
-        size = 18, spacing = 400,
-        shadow = { offset = { X=0, Y=0 }, color = { R=0.55, G=0.88, B=1.0, A=1.0 } },
+        size = 18, spacing = 400, opacity = 0.45,
+        shadow = { offset = { X=0, Y=0 }, color = { R=0.45, G=0.65, B=0.80, A=0.6 } },
     },
     stats = {
         size = 12, spacing = 100, opacity = 0.55,
