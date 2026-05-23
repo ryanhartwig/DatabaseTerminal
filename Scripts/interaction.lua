@@ -60,7 +60,7 @@ local loadingAlive = false  -- flag for LoopAsync animation teardown
 
 -- Visual center correction — midX/midY from getPanelBounds is mathematically
 -- correct but appears offset against the background art on screen.
-local CENTER_NUDGE_X = -0.026
+local CENTER_NUDGE_X = -0.024
 local CENTER_NUDGE_Y = -0.024
 
 --- Try to apply a game material to an Image widget (graceful no-op if not loaded)
@@ -192,11 +192,13 @@ local function showLoadingScreen()
     labelSlot:SetAutoSize(true)
     pcall(function() labelSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
 
-    -- Alterra logo — offset +0.025 from midX to align with text visual center
-    local logoNudge = 0.025
+    -- Alterra logo — centered below scanning text
+    -- Uses raw panel center (not nudged midX) since anchor boxes don't have
+    -- SetAlignment and the nudge would shift the box off-center
+    local rawCenterX = (L + R) / 2
     applyMaterial(root, canvas, "AlterraLogo",
         "/Game/UI/Materials_test/Glitch/M_Glitch.M_Glitch",
-        midX + logoNudge - 0.045, midY + 0.20, midX + logoNudge + 0.045, midY + 0.27, 0.8)
+        rawCenterX - 0.045, midY + 0.20, rawCenterX + 0.045, midY + 0.27, 0.8)
 
     -- Subtle terminal-style opacity jitter on the scanning text
     LoopAsync(120, function()
