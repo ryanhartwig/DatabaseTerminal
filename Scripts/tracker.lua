@@ -1,5 +1,6 @@
 -- DatabaseTerminal: Build action tracker
--- Tracks which BioBeds are our Database Terminals via builder menu hooks
+-- Tracks which CTI terminals are Database Terminals via builder menu hooks
+-- and hidden locker UGC sync (multiplayer-safe).
 
 local state = require("state")
 local visuals = require("visuals")
@@ -19,18 +20,53 @@ function tracker.getTerminals()
     return terminalActors
 end
 
---- Load saved state from disk
+--- Re-tag terminals from a list of positions (called by sync poll)
+local function syncFromPositions(positions)
+    local MATCH_DISTANCE = 50
+    local terminals = FindAllOf(ACTOR_CLASS)
+    if not terminals then return end
+
+    local newActors = {}
+    for _, terminal in ipairs(terminals) do
+        if terminal:IsValid() then
+            local loc = terminal:K2_GetActorLocation()
+            for _, saved in ipairs(positions) do
+                local dx = loc.X - saved.x
+                local dy = loc.Y - saved.y
+                local dz = loc.Z - saved.z
+                local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+                if dist < MATCH_DISTANCE then
+                    local fname = terminal:GetFName():ToString()
+                    newActors[fname] = { pos = { X = loc.X, Y = loc.Y, Z = loc.Z } }
+
+                    -- Apply visuals if this is a newly discovered terminal
+                    if not terminalActors[fname] then
+                        print("[DBTerminal] Sync: new terminal " .. fname .. "\n")
+                        pcall(function() visuals.apply(terminal) end)
+                    end
+                    break
+                end
+            end
+        end
+    end
+
+    terminalActors = newActors
+end
+
+--- Load saved state
 function tracker.loadState()
     visuals.clearCache()
-    terminalActors = {}  -- clear stale entries from previous world
+    terminalActors = {}
+
     local loaded = state.load()
     local count = 0
     for k, v in pairs(loaded) do
         terminalActors[k] = v
         count = count + 1
     end
+
     if count > 0 then
-        print(string.format("[DBTerminal] Restored %d terminal(s) from save\n", count))
+        print(string.format("[DBTerminal] Restored %d terminal(s)\n", count))
         ExecuteWithDelay(2000, function()
             ExecuteInGameThread(function()
                 visuals.applyAll(terminalActors)
@@ -42,7 +78,7 @@ function tracker.loadState()
     end
 end
 
---- Initialize hooks for build action tracking
+--- Initialize hooks
 function tracker.init()
     -- Track which recipe the player selected in the builder menu
     RegisterCustomEvent("RecipeClicked", function(self, ...)
@@ -66,7 +102,6 @@ function tracker.init()
             if lastBuildAction ~= BUILD_ACTION_NAME then return end
 
             ExecuteInGameThread(function()
-                -- Snapshot existing BioBeds
                 local existing = {}
                 local beds = FindAllOf(ACTOR_CLASS)
                 if beds then
@@ -75,7 +110,6 @@ function tracker.init()
                     end
                 end
 
-                -- Poll for new terminal
                 local attempts = 0
                 LoopAsync(500, function()
                     attempts = attempts + 1
@@ -89,7 +123,8 @@ function tracker.init()
                                 if not existing[fname] and not terminalActors[fname] then
                                     local loc = bed:K2_GetActorLocation()
                                     terminalActors[fname] = { pos = { X = loc.X, Y = loc.Y, Z = loc.Z } }
-                                    state.save(terminalActors)
+                                    -- Write to hidden locker (replicates to all clients)
+                                    state.addTerminal(loc)
                                     visuals.apply(bed)
                                     print("[DBTerminal] Tagged terminal: " .. fname .. "\n")
                                     return true
@@ -98,25 +133,51 @@ function tracker.init()
                         end
                         return false
                     end)
-                    if not ok then return true end  -- error = stop
+                    if not ok then return true end
                     return found
                 end)
             end)
         end)
     end)
 
-    -- Load state on mod reload (immediate, with delay for world to be ready)
+    -- Register sync callback — when hidden locker label changes, re-tag terminals
+    state.onSync(function(positions)
+        print(string.format("[DBTerminal] [sync] Sync callback fired with %d position(s)\n", #positions))
+        ExecuteInGameThread(function()
+            syncFromPositions(positions)
+        end)
+    end)
+
+    -- Initialize hidden locker + sync poll
     ExecuteWithDelay(2000, function()
+        ExecuteInGameThread(function()
+            pcall(function() state.init() end)
+        end)
+    end)
+
+    -- Load state on mod reload
+    ExecuteWithDelay(3000, function()
         ExecuteInGameThread(function()
             pcall(tracker.loadState)
         end)
     end)
 
-    -- Load state on fresh game start (OnPossessedPawn fires when player spawns)
+    -- Load state on game start / world change
     RegisterHook("/Script/Subnautica2.SN2PlayerController:OnPossessedPawnChangedFunction", function()
         ExecuteWithDelay(3000, function()
             ExecuteInGameThread(function()
+                -- Clear stale cache from previous world
+                state.clearCache()
+
+                -- Load from state.json immediately (reliable, always available)
                 pcall(tracker.loadState)
+
+                -- Then init hidden locker for multiplayer sync (async, may take a few seconds)
+                ExecuteWithDelay(1000, function()
+                    ExecuteInGameThread(function()
+                        pcall(function() state.init() end)
+                    end)
+                end)
             end)
         end)
     end)
