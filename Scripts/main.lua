@@ -131,6 +131,41 @@ interaction.init({
 
 print("[DBTerminal] Ready.\n")
 
+-- DEV: Manual locker search (F8)
+RegisterKeyBind(Key.F8, function()
+    ExecuteInGameThread(function()
+        print("[DBTerminal] [F8] Manual locker search...\n")
+        local allUGC = FindAllOf("UWEUGCComponent")
+        if not allUGC then
+            print("[DBTerminal] [F8] No UGCComponents found at all\n")
+            return
+        end
+        print(string.format("[DBTerminal] [F8] Found %d UGCComponents\n", #allUGC))
+        local dbtCount = 0
+        for i, ugc in ipairs(allUGC) do
+            pcall(function()
+                if ugc:IsValid() then
+                    local has = ugc:HasUserGeneratedContent()
+                    if has then
+                        local texts = ugc.PlayerTexts
+                        if texts and #texts > 0 then
+                            local val = texts[1].Value:ToString()
+                            local owner = ugc:GetOwner()
+                            local cls = "?"
+                            pcall(function() cls = owner:GetClass():GetFName():ToString() end)
+                            print(string.format("[DBTerminal] [F8] UGC[%d] owner=%s val='%s'\n", i, cls, val))
+                            if val and val:find("^DBT") then
+                                dbtCount = dbtCount + 1
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        print(string.format("[DBTerminal] [F8] DBT lockers found: %d\n", dbtCount))
+    end)
+end)
+
 ----------------------------------------------------------------------
 -- DEV: Live nudge tool for UI positioning
 -- Enable via config.txt: dev_nudge = true
