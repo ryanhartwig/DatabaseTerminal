@@ -20,8 +20,7 @@ local styles = {}
 ----------------------------------------------------------------------
 styles.defs = {
     title = {
-        size = 18, spacing = 400, opacity = 0.45,
-        shadow = { offset = { X=0, Y=0 }, color = { R=0.45, G=0.65, B=0.80, A=0.6 } },
+        size = 24, spacing = 300, opacity = 0.15,
     },
     stats = {
         size = 12, spacing = 100, opacity = 0.55,
@@ -87,9 +86,9 @@ function styles.apply(tb, name)
     local def = styles.defs[name]
     if not def then return end
 
-    -- Opacity (dimming)
+    -- Opacity (dimming — SetRenderOpacity affects entire widget including shadow)
     if def.opacity then
-        pcall(function() tb:SetOpacity(def.opacity) end)
+        pcall(function() tb:SetRenderOpacity(def.opacity) end)
     end
 
     -- Font (size, spacing, outline)

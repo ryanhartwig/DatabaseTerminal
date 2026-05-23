@@ -4,6 +4,46 @@
 local UEHelpers = require("UEHelpers")
 local scanner = {}
 
+----------------------------------------------------------------------
+-- Container name lookup via UWEItemType (localized)
+----------------------------------------------------------------------
+local CONTAINER_ITEM_TYPES = {
+    BP_Locker_Floor_C              = "DA_FloorLocker_ItemType",
+    BP_LifepodWallLocker_C         = "DA_WallLocker_ItemType",
+    BP_FloatingLocker_Carryable_C  = "DA_FloatingLocker_Carryable_ItemType",
+    BP_BasicBatteryTerminal_C      = "DA_BasicBatteryTerminal_ItemType",
+    BP_PowerCellTerminal_C         = "DA_PowerCellTerminal_ItemType",
+    BP_Tailing_Chest_C             = "DA_FloorLocker_ItemType",
+    SN2Bioreactor                  = "DA_Bioreactor_ItemType",
+    SN2ProcessorStation            = "DA_Processor_ItemType",
+    SN2BoxOfHolding                = "DA_StorageCache_ItemType",
+    SN2Locker                      = "DA_WallLocker_ItemType",
+}
+
+--- Get the localized container name from its UWEItemType.
+--- Falls back to "Locker" if the ItemType can't be found.
+local function getLocalizedContainerName(actorClass, sourceClass)
+    local targetName = CONTAINER_ITEM_TYPES[actorClass]
+    if not targetName and sourceClass then
+        targetName = CONTAINER_ITEM_TYPES[sourceClass]
+    end
+    if not targetName then return nil end
+
+    local allTypes = FindAllOf("UWEItemType")
+    if allTypes then
+        for _, itemType in ipairs(allTypes) do
+            local ok, name = pcall(function() return itemType:GetFName():ToString() end)
+            if ok and name == targetName then
+                local nameOk, locName = pcall(function() return itemType.Name:ToString() end)
+                if nameOk and locName and locName ~= "" then
+                    return locName
+                end
+            end
+        end
+    end
+    return nil
+end
+
 --- Get distance between a position and an actor
 local function getDistanceFromPos(pos, actor)
     local loc = actor:K2_GetActorLocation()
@@ -96,15 +136,16 @@ function scanner.scan(terminalPos, radiusMeters)
                             local isEmpty = inv:IsEmpty()
                             if not isEmpty then
                                 containerCount = containerCount + 1
-                                local label = nil
-                                pcall(function() label = source.labelFn(actor) end)
-                                if not label then label = source.class end
-
                                 -- Get actual actor class for icon differentiation
-                                -- Store both: specific class (for wall vs floor locker)
-                                -- and source class (fallback for icon lookup)
                                 local actorClass = source.class
                                 pcall(function() actorClass = actor:GetClass():GetFName():ToString() end)
+
+                                -- Label: user-set name → localized container name → fallback
+                                local label = nil
+                                pcall(function() label = source.labelFn(actor) end)
+                                if not label then
+                                    label = getLocalizedContainerName(actorClass, source.class) or "Locker"
+                                end
 
                                 local invItems = inv:GetItems()
                                 if invItems then

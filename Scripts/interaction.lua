@@ -60,10 +60,10 @@ end
 
 local loadingAlive = false  -- flag for LoopAsync animation teardown
 
--- Visual center correction — midX/midY from getPanelBounds is mathematically
--- correct but appears offset against the background art on screen.
-local CENTER_NUDGE_X = -0.024
-local CENTER_NUDGE_Y = -0.024
+-- Visual center correction as fraction of panel dimensions (not viewport).
+-- Scales correctly across resolutions. Tuned at 1920x1080.
+local CENTER_NUDGE_X = -0.034  -- fraction of panel width
+local CENTER_NUDGE_Y = -0.030  -- fraction of panel height
 
 --- Try to apply a game material to an Image widget (graceful no-op if not loaded)
 local function applyMaterial(root, canvas, name, matPath, x1, y1, x2, y2, opacity)
@@ -109,8 +109,10 @@ local function showLoadingScreen()
     root.WidgetTree.RootWidget = canvas
 
     local L, R, T, B = getPanelBounds(pc)
-    local midX = (L + R) / 2 + CENTER_NUDGE_X
-    local midY = (T + B) / 2 + CENTER_NUDGE_Y
+    local panelW = R - L
+    local panelH = B - T
+    local midX = (L + R) / 2 + CENTER_NUDGE_X * panelW
+    local midY = (T + B) / 2 + CENTER_NUDGE_Y * panelH
 
     -- Background (with hex grid baked in)
     local bgTex = textures.get("Background")
@@ -167,13 +169,15 @@ local function showLoadingScreen()
     ----------------------------------------------------------------
     local sizeBoxCls = StaticFindObject("/Script/UMG.SizeBox")
 
-    -- Title header
-    local title = StaticConstructObject(textCls, root, FName("LoadTitle"))
-    title:SetText(FText("DATABASE TERMINAL"))
-    styles.apply(title, "title")
-    local titleSlot = canvas:AddChildToCanvas(title)
-    titleSlot:SetAnchors({ Minimum = { X = L+0.035, Y = T+0.035 }, Maximum = { X = L+0.035, Y = T+0.035 } })
-    titleSlot:SetAutoSize(true)
+    -- Title header (disabled — only shown in terminal view)
+    -- local title = StaticConstructObject(textCls, root, FName("LoadTitle"))
+    -- title:SetText(FText("DATABASE TERMINAL"))
+    -- styles.apply(title, "title")
+    -- local titleSlot = canvas:AddChildToCanvas(title)
+    -- local loadTitleX = (L + R) / 2 + CENTER_NUDGE_X * panelW
+    -- titleSlot:SetAnchors({ Minimum = { X = loadTitleX, Y = T+0.044 }, Maximum = { X = loadTitleX, Y = T+0.044 } })
+    -- titleSlot:SetAutoSize(true)
+    -- pcall(function() titleSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
 
     -- Footer version
     local ver = StaticConstructObject(textCls, root, FName("LoadVer"))
@@ -194,13 +198,24 @@ local function showLoadingScreen()
     labelSlot:SetAutoSize(true)
     pcall(function() labelSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
 
-    -- Alterra logo — centered below scanning text
-    -- Uses raw panel center (not nudged midX) since anchor boxes don't have
-    -- SetAlignment and the nudge would shift the box off-center
-    local rawCenterX = (L + R) / 2
-    applyMaterial(root, canvas, "AlterraLogo",
-        "/Game/UI/Materials_test/Glitch/M_Glitch.M_Glitch",
-        rawCenterX - 0.045, midY + 0.20, rawCenterX + 0.045, midY + 0.27, 0.8)
+    -- Alterra logo — centered below text, fixed pixel size to prevent stretch
+    pcall(function()
+        local sizeBoxCls = StaticFindObject("/Script/UMG.SizeBox")
+        local mat = StaticFindObject("/Game/UI/Materials_test/Glitch/M_Glitch.M_Glitch")
+        if mat and sizeBoxCls then
+            local logoImg = StaticConstructObject(imgCls, root, FName("AlterraLogo"))
+            logoImg:SetBrushFromMaterial(mat)
+            logoImg:SetRenderOpacity(0.8)
+            local logoBox = StaticConstructObject(sizeBoxCls, root, FName("LogoBox"))
+            logoBox:SetWidthOverride(80)
+            logoBox:SetHeightOverride(50)
+            logoBox:SetContent(logoImg)
+            local logoSlot = canvas:AddChildToCanvas(logoBox)
+            logoSlot:SetAnchors({ Minimum = { X = midX, Y = midY + 0.22 }, Maximum = { X = midX, Y = midY + 0.22 } })
+            logoSlot:SetAutoSize(true)
+            logoSlot:SetAlignment({ X = 0.5, Y = 0.5 })
+        end
+    end)
 
     -- Subtle terminal-style opacity jitter on the scanning text
     LoopAsync(120, function()

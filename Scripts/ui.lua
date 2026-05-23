@@ -98,16 +98,22 @@ local cachedButtonClass = nil
 
 local function getButtonClass()
     if cachedButtonClass then return cachedButtonClass end
-    local candidates = FindAllOf("CommonButtonBase")
-    if candidates then
-        for _, btn in ipairs(candidates) do
-            if btn:IsValid() then
-                cachedButtonClass = btn:GetClass()
-                return cachedButtonClass
+    -- Use the slim blue button from PDA Signal Manager (same as "EDIT" buttons)
+    cachedButtonClass = StaticFindObject(
+        "/Game/Blueprints/UI/GenericUIElements/GenericUI_WBP/WBP_ButtonGenericBlueSmall.WBP_ButtonGenericBlueSmall_C")
+    -- Fallback: grab any CommonButtonBase instance class
+    if not cachedButtonClass then
+        local candidates = FindAllOf("CommonButtonBase")
+        if candidates then
+            for _, btn in ipairs(candidates) do
+                if btn:IsValid() then
+                    cachedButtonClass = btn:GetClass()
+                    return cachedButtonClass
+                end
             end
         end
     end
-    return nil
+    return cachedButtonClass
 end
 
 local function makeButton(root, text, onClick)
@@ -355,19 +361,33 @@ local function buildHeader(root, canvas, groups, closeCb)
     -- Title
     local title = makeText(root, "DATABASE TERMINAL", "title")
     local titleSlot = canvas:AddChildToCanvas(title)
-    titleSlot:SetAnchors({ Minimum = { X = L+0.035, Y = T+0.035 }, Maximum = { X = L+0.035, Y = T+0.035 } })
+    local panelW = R - L
+    local titleMidX = (L + R) / 2 - 0.034 * panelW  -- same nudge as loading screen
+    titleSlot:SetAnchors({ Minimum = { X = titleMidX, Y = T+0.05 }, Maximum = { X = titleMidX, Y = T+0.05 } })
+    pcall(function() titleSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
     titleSlot:SetAutoSize(true)
 
     -- Footer version
     local ver = makeText(root, "Database Terminal v0.1.0", "footer")
     local verSlot = canvas:AddChildToCanvas(ver)
-    verSlot:SetAnchors({ Minimum = { X = L+0.05, Y = PANEL.B-0.065 }, Maximum = { X = L+0.05, Y = PANEL.B-0.065 } })
+    verSlot:SetAnchors({ Minimum = { X = L+0.05, Y = PANEL.B-0.066 }, Maximum = { X = L+0.05, Y = PANEL.B-0.066 } })
     verSlot:SetAutoSize(true)
 
-    -- Alterra glitch logo — top-right area, always animating
-    applyMaterial(root, canvas, "AlterraLogo",
-        "/Game/UI/Materials_test/Glitch/M_Glitch.M_Glitch",
-        R - 0.12, T + 0.025, R - 0.03, T + 0.095, 0.8)
+    -- Alterra glitch logo — top-right, fixed pixel size to prevent stretch
+    pcall(function()
+        local mat = StaticFindObject("/Game/UI/Materials_test/Glitch/M_Glitch.M_Glitch")
+        if mat then
+            local logoImg = makeImage(root)
+            pcall(function() logoImg:SetBrushFromMaterial(mat) end)
+            pcall(function() logoImg:SetRenderOpacity(0.8) end)
+            local logoBox = makeSizeBox(root, 80, 50)
+            logoBox:SetContent(logoImg)
+            local logoSlot = canvas:AddChildToCanvas(logoBox)
+            logoSlot:SetAnchors({ Minimum = { X = R - 0.10, Y = T + 0.055 }, Maximum = { X = R - 0.10, Y = T + 0.055 } })
+            logoSlot:SetAutoSize(true)
+            pcall(function() logoSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
+        end
+    end)
 end
 
 
@@ -413,8 +433,8 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
     groupWidgets = {}
 
     -- Position scrollbox
-    local contentTop = PANEL.T + PANEL.HEADER_H + 0.045  -- extra space for search box
-    local contentBot = PANEL.B - 0.05
+    local contentTop = PANEL.T + PANEL.HEADER_H + 0.055  -- extra space for search box
+    local contentBot = PANEL.B - 0.055
     local scrollSlot = canvas:AddChildToCanvas(scrollBox)
     scrollSlot:SetAnchors({
         Minimum = { X = PANEL.L + PANEL.CONTENT_PAD + 0.01, Y = contentTop },
@@ -451,7 +471,7 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
 
         local nameText = makeText(root, group.displayName, "itemName")
         local nameSlot = itemHeader:AddChildToHorizontalBox(nameText)
-        pcall(function() nameSlot:SetVerticalAlignment(1) end)  -- VAlign_Center
+        pcall(function() nameSlot:SetPadding({ Top = 12, Bottom = 0, Left = 0, Right = 0 }) end)
 
         -- Fill spacer pushes count to the right
         local headerSpacer = StaticConstructObject(classes.sizeBox, root, newName("Spacer"))
@@ -461,7 +481,7 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
 
         local countText = makeText(root, "x" .. group.totalCount, "count")
         local countSlot = itemHeader:AddChildToHorizontalBox(countText)
-        pcall(function() countSlot:SetVerticalAlignment(1) end)  -- VAlign_Center
+        pcall(function() countSlot:SetPadding({ Top = 14, Bottom = 0, Left = 0, Right = 0 }) end)
         gw.countText = countText
 
         groupBox:AddChildToVerticalBox(itemHeader)
@@ -495,7 +515,7 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
 
             local labelText = makeText(root, container.label, "container")
             local labelSlot = subRow:AddChildToHorizontalBox(labelText)
-            pcall(function() labelSlot:SetVerticalAlignment(1) end)  -- VAlign_Center
+            pcall(function() labelSlot:SetPadding({ Top = 8, Bottom = 0, Left = 0, Right = 0 }) end)
 
             -- Fill spacer pushes count + button to the right
             local spacer = StaticConstructObject(classes.sizeBox, root, newName("Spacer"))
@@ -505,14 +525,13 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
 
             local subCount = makeText(root, "x" .. container.count .. "  ", "countSub")
             local subCountSlot = subRow:AddChildToHorizontalBox(subCount)
-            pcall(function() subCountSlot:SetVerticalAlignment(1) end)  -- VAlign_Center
+            pcall(function() subCountSlot:SetPadding({ Top = 6, Bottom = 0, Left = 0, Right = 0 }) end)
 
             local pullBtn = makeButton(root, "PULL", function()
                 if pullCallback and #container.items > 0 then
                     pullCallback(container, container.items[1], group)
                 end
             end)
-            pcall(function() pullBtn:SetRenderScale({ X = 0.8, Y = 0.8 }) end)
             subRow:AddChildToHorizontalBox(pullBtn)
 
             groupBox:AddChildToVerticalBox(subRow)
@@ -592,7 +611,7 @@ function ui.open(groups, closeCb, onPull)
     buildHeader(root, canvas, groups, closeCb)
 
     -- Search box with animated material background
-    local searchY = PANEL.T + PANEL.HEADER_H + 0.005
+    local searchY = PANEL.T + PANEL.HEADER_H + 0.015
     local searchL = PANEL.L + PANEL.CONTENT_PAD + 0.01
     local searchR = PANEL.R - PANEL.CONTENT_PAD - 0.01
 
