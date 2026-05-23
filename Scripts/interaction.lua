@@ -405,6 +405,28 @@ local function open(actor)
             return
         end
 
+        -- Verify the item still exists in the source container (prevents
+        -- pulling from another player's inventory if they took it first)
+        local stillExists = false
+        pcall(function()
+            local sourceItems = container.lockerInv:GetItems()
+            if sourceItems then
+                for _, item in ipairs(sourceItems) do
+                    pcall(function()
+                        local s = item:get()
+                        if s.ItemId == itemEntry.itemId then
+                            stillExists = true
+                        end
+                    end)
+                end
+            end
+        end)
+        if not stillExists then
+            print("[DBTerminal] Item no longer in container\n")
+            ui.showMessage("Item no longer available")
+            return
+        end
+
         local ok, err = pcall(function()
             playerInv:MoveItemBetweenInventories(
                 itemEntry.itemId,
