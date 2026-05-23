@@ -643,14 +643,14 @@ function ui.open(groups, closeCb, onPull, refreshCb)
     local searchR = pX(0.96)
 
     if refreshCb then
-        searchR = pX(0.85)  -- shrink search to fit refresh button
+        searchR = pX(0.80)  -- shrink search to fit refresh button
         local refreshBtn = makeButton(root, "REFRESH", function()
             refreshCb()
         end)
         local refreshSlot = canvas:AddChildToCanvas(refreshBtn)
         refreshSlot:SetAnchors({
-            Minimum = { X = pX(0.86), Y = searchY },
-            Maximum = { X = pX(0.86), Y = searchY }
+            Minimum = { X = pX(0.81), Y = searchY },
+            Maximum = { X = pX(0.81), Y = searchY }
         })
         refreshSlot:SetAutoSize(true)
     end
