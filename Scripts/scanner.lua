@@ -13,7 +13,11 @@ local CONTAINER_ITEM_TYPES = {
     BP_FloatingLocker_Carryable_C  = "DA_FloatingLocker_Carryable_ItemType",
     BP_BasicBatteryTerminal_C      = "DA_BasicBatteryTerminal_ItemType",
     BP_PowerCellTerminal_C         = "DA_PowerCellTerminal_ItemType",
-    BP_Tailing_Chest_C             = "DA_FloorLocker_ItemType",
+    BP_Tailing_Chest_C             = "DA_Tailing_Chest_ItemType",
+    BP_Tailing_Jar_C               = "DA_Tailing_Jar_ItemType",
+    BP_Tailing_Jar_Hanging_C       = "DA_Tailing_Jar_Hanging_ItemType",
+    BP_Tailing_Jar_Coral_C         = "DA_Tailing_Jar_Coral_ItemType",
+    BP_Tailing_Jar_Coral_Small_C   = "DA_Tailing_Jar_Coral_Small_ItemType",
     SN2Bioreactor                  = "DA_Bioreactor_ItemType",
     SN2ProcessorStation            = "DA_Processor_ItemType",
     SN2BoxOfHolding                = "DA_StorageCache_ItemType",
@@ -73,7 +77,9 @@ local function getLockerLabel(actor)
     return nil
 end
 
---- Scan all nearby containers and return a flat table of item entries
+--- Scan nearby containers and return a flat table of item entries.
+--- Uses a known-container list since the game uses multiple inventory patterns
+--- (UWEInventoryComponent, UWEInventory, etc.) that can't be unified.
 --- @param terminalPos table {X, Y, Z} position of the terminal actor
 --- @param radiusMeters number scan radius in meters
 --- @return table items, number containerCount
@@ -81,24 +87,28 @@ function scanner.scan(terminalPos, radiusMeters)
     local radiusUnits = radiusMeters * 100  -- UE uses centimeters
 
     local containerSources = {
-        -- Lockers (floor, wall, lifepod)
+        -- Tailing containers (before SN2Locker — chest is a subclass but uses UWEInventory not Inventory)
+        { class = "BP_Tailing_Chest_C",              getInv = function(a) return a.UWEInventory end,            labelFn = nil },
+        { class = "BP_Tailing_Jar_C",                getInv = function(a) return a.UWEInventory or a.InventoryComponent or a.Inventory end, labelFn = nil },
+        -- Lockers (floor, wall, lifepod — all subclasses of SN2Locker)
         { class = "SN2Locker",                       getInv = function(a) return a.Inventory end,            labelFn = getLockerLabel },
         -- Portable/floating lockers
-        { class = "BP_FloatingLocker_Carryable_C",   getInv = function(a) return a.UWEInventory end,         labelFn = function() return "Portable Locker" end },
-        -- Tailing chests (try Inventory first like SN2Locker, fall back to InventoryComponent)
-        { class = "BP_Tailing_Chest_C",              getInv = function(a) return a.Inventory or a.InventoryComponent end, labelFn = function() return "Tailing Chest" end },
+        { class = "BP_FloatingLocker_Carryable_C",   getInv = function(a) return a.UWEInventory end,         labelFn = nil },
+        { class = "BP_Tailing_Jar_Hanging_C",        getInv = function(a) return a.UWEInventory or a.InventoryComponent or a.Inventory end, labelFn = nil },
+        { class = "BP_Tailing_Jar_Coral_C",          getInv = function(a) return a.UWEInventory or a.InventoryComponent or a.Inventory end, labelFn = nil },
+        { class = "BP_Tailing_Jar_Coral_Small_C",    getInv = function(a) return a.UWEInventory or a.InventoryComponent or a.Inventory end, labelFn = nil },
         -- Chargers
-        { class = "BP_BasicBatteryTerminal_C",       getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Battery Charger" end },
-        { class = "BP_PowerCellTerminal_C",          getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Power Cell Charger" end },
+        { class = "BP_BasicBatteryTerminal_C",       getInv = function(a) return a.InventoryComponent end,   labelFn = nil },
+        { class = "BP_PowerCellTerminal_C",          getInv = function(a) return a.InventoryComponent end,   labelFn = nil },
         -- Bioreactor
-        { class = "SN2Bioreactor",                   getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Bioreactor" end },
+        { class = "SN2Bioreactor",                   getInv = function(a) return a.InventoryComponent end,   labelFn = nil },
         -- Processor (input + output inventories)
-        { class = "SN2ProcessorStation",             getInv = function(a) return a.OutputInventory end,      labelFn = function() return "Processor Output" end },
-        { class = "SN2ProcessorStation",             getInv = function(a) return a.InputInventory end,       labelFn = function() return "Processor Input" end },
+        { class = "SN2ProcessorStation",             getInv = function(a) return a.OutputInventory end,      labelFn = nil },
+        { class = "SN2ProcessorStation",             getInv = function(a) return a.InputInventory end,       labelFn = nil },
         -- Storage cache
-        { class = "SN2BoxOfHolding",                 getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Storage Cache" end },
+        { class = "SN2BoxOfHolding",                 getInv = function(a) return a.InventoryComponent end,   labelFn = nil },
         -- Blackbox
-        { class = "BP_PlayerDied_Blackbox_Proto_C",  getInv = function(a) return a.InventoryComponent end,   labelFn = function() return "Blackbox" end },
+        { class = "BP_PlayerDied_Blackbox_Proto_C",  getInv = function(a) return a.InventoryComponent end,   labelFn = nil },
     }
 
     local items = {}
@@ -136,35 +146,38 @@ function scanner.scan(terminalPos, radiusMeters)
                             local isEmpty = inv:IsEmpty()
                             if not isEmpty then
                                 containerCount = containerCount + 1
-                                -- Get actual actor class for icon differentiation
+
+                                -- Actor class for icon differentiation
                                 local actorClass = source.class
                                 pcall(function() actorClass = actor:GetClass():GetFName():ToString() end)
 
                                 -- Label: user-set name → localized container name → fallback
                                 local label = nil
-                                pcall(function() label = source.labelFn(actor) end)
+                                if source.labelFn then
+                                    pcall(function() label = source.labelFn(actor) end)
+                                end
                                 if not label then
-                                    label = getLocalizedContainerName(actorClass, source.class) or "Locker"
+                                    label = getLocalizedContainerName(actorClass, source.class) or "Container"
                                 end
 
                                 local invItems = inv:GetItems()
                                 if invItems then
                                     for _, item in ipairs(invItems) do
-                                        local s = item:get()
-                                        local typeName = s.ItemType:GetFName():ToString()
-                                        local displayName = s.ItemType.Name:ToString()
-                                        table.insert(items, {
-                                            displayName = displayName,
-                                            typeName = typeName,
-                                            itemId = s.ItemId,
-                                            inventoryId = invId,
-                                            count = 1,
-                                            lockerLabel = label,
-                                            lockerInv = inv,
-                                            itemType = s.ItemType,
-                                            containerClass = actorClass,
-                                            sourceClass = source.class,
-                                        })
+                                        pcall(function()
+                                            local s = item:get()
+                                            table.insert(items, {
+                                                displayName = s.ItemType.Name:ToString(),
+                                                typeName = s.ItemType:GetFName():ToString(),
+                                                itemId = s.ItemId,
+                                                inventoryId = invId,
+                                                count = 1,
+                                                lockerLabel = label,
+                                                lockerInv = inv,
+                                                itemType = s.ItemType,
+                                                containerClass = actorClass,
+                                                sourceClass = source.class,
+                                            })
+                                        end)
                                     end
                                 end
                             end

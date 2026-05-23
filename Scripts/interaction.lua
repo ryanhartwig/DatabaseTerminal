@@ -388,8 +388,13 @@ local function open(actor)
         local playerInv = pawn.InventoryComponent
         if not playerInv or not playerInv:IsValid() then return end
 
-        if playerInv:IsFull() then
+        local isFull = false
+        pcall(function()
+            isFull = playerInv:IsFull() or (playerInv:NumItems() >= playerInv.MaxItems)
+        end)
+        if isFull then
             print("[DBTerminal] Inventory full!\n")
+            ui.showMessage("Inventory full")
             return
         end
 

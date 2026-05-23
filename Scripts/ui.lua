@@ -150,7 +150,11 @@ local CONTAINER_ITEM_TYPES = {
     BP_BasicBatteryTerminal_C           = "DA_BasicBatteryTerminal_ItemType",
     BP_PowerCellTerminal_C              = "DA_PowerCellTerminal_ItemType",
     -- Other containers
-    BP_Tailing_Chest_C                  = "DA_FloorLocker_ItemType",
+    BP_Tailing_Chest_C                  = "DA_Tailing_Chest_ItemType",
+    BP_Tailing_Jar_C                    = "DA_Tailing_Jar_ItemType",
+    BP_Tailing_Jar_Hanging_C            = "DA_Tailing_Jar_Hanging_ItemType",
+    BP_Tailing_Jar_Coral_C              = "DA_Tailing_Jar_Coral_ItemType",
+    BP_Tailing_Jar_Coral_Small_C        = "DA_Tailing_Jar_Coral_Small_ItemType",
     SN2Bioreactor                       = "DA_Bioreactor_ItemType",
     SN2ProcessorStation                 = "DA_Processor_ItemType",
     SN2BoxOfHolding                     = "DA_StorageCache_ItemType",
@@ -420,9 +424,12 @@ function ui.onPullComplete(container, group)
                 end
             end
 
-            -- Hide entire group if total is 0
+            -- Hide entire group + its divider if total is 0
             if group.totalCount <= 0 then
                 pcall(function() gw.groupBox:SetVisibility(1) end)
+                if gw.divider then
+                    pcall(function() gw.divider:SetVisibility(1) end)
+                end
             end
         end
     end
@@ -552,6 +559,7 @@ local function buildContent(root, canvas, scrollBox, groups, pullCallback)
             local divSize = makeSizeBox(root, nil, 2)
             divSize:SetContent(divider)
             scrollBox:AddChild(divSize)
+            gw.divider = divSize
         end
 
         table.insert(groupWidgets, gw)
@@ -570,6 +578,36 @@ local pullCallback = nil
 
 function ui.getRoot()
     return root
+end
+
+--- Flash a temporary message at the bottom of the panel (auto-fades after 2s)
+local messageWidget = nil
+function ui.showMessage(text)
+    if not root or not canvas then return end
+    -- Remove existing message
+    if messageWidget then
+        pcall(function() messageWidget:SetVisibility(1) end)
+    end
+    -- Create or reuse
+    if not messageWidget then
+        messageWidget = makeText(root, text, "loading")
+        local msgSlot = canvas:AddChildToCanvas(messageWidget)
+        local midX = (PANEL.L + PANEL.R) / 2
+        msgSlot:SetAnchors({ Minimum = { X = midX, Y = PANEL.B - 0.08 }, Maximum = { X = midX, Y = PANEL.B - 0.08 } })
+        msgSlot:SetAutoSize(true)
+        pcall(function() msgSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
+    else
+        pcall(function() messageWidget:SetText(FText(text)) end)
+    end
+    pcall(function() messageWidget:SetVisibility(0) end)
+    -- Auto-hide after 2 seconds
+    ExecuteWithDelay(2000, function()
+        ExecuteInGameThread(function()
+            if messageWidget then
+                pcall(function() messageWidget:SetVisibility(1) end)
+            end
+        end)
+    end)
 end
 
 ----------------------------------------------------------------------
@@ -668,6 +706,7 @@ end
 function ui.close()
     buttonActions = {}
     groupWidgets = {}
+    messageWidget = nil
 
     if root then
         pcall(function() root:RemoveFromViewport() end)
