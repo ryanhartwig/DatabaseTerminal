@@ -52,7 +52,7 @@ local function getPanelBounds(pc)
         local maxW = 0.92 * vpW
         if panelW > maxW then panelW = maxW end
         local halfW = (panelW / vpW) / 2
-        local centerX = config and config.PanelCenterX or 0.5
+        local centerX = 0.523
         L = centerX - halfW
         R = centerX + halfW
     end

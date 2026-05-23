@@ -12,6 +12,7 @@ config.DevNudge = false
 config.NudgeStartX = 0.5
 config.NudgeStartY = 0.5
 config.PanelCenterX = 0.5  -- horizontal center of the panel (viewport fraction)
+config.NudgeMode = "slot"  -- "slot" = nudge a UI element, "panel" = nudge whole panel
 
 local function loadConfig()
     local file = io.open(config.ModDir .. "config.txt", "r")
@@ -38,8 +39,13 @@ loadConfig()
 
 -- Dev tools config (gitignored, not shipped)
 local function loadDevConfig()
-    local file = io.open(config.ModDir .. "dev.txt", "r")
-    if not file then return end
+    local devPath = config.ModDir .. "dev.txt"
+    local file = io.open(devPath, "r")
+    if not file then
+        print(string.format("[DBTerminal] No dev.txt at: %s\n", devPath))
+        return
+    end
+    print("[DBTerminal] Loading dev.txt\n")
     for line in file:lines() do
         local key, val = line:match("^(%w+)%s*=%s*(.+)$")
         if key and val then
@@ -52,6 +58,8 @@ local function loadDevConfig()
                 config.NudgeStartY = tonumber(val) or config.NudgeStartY
             elseif key == "panel_center_x" then
                 config.PanelCenterX = tonumber(val) or config.PanelCenterX
+            elseif key == "nudge_mode" then
+                config.NudgeMode = val
             end
         end
     end

@@ -257,14 +257,14 @@ local function computeBounds()
     if panelW > maxW then panelW = maxW end
 
     local halfW = (panelW / vpW) / 2
-    local centerX = config and config.PanelCenterX or 0.5
+    local centerX = 0.523
     PANEL.L = centerX - halfW
     PANEL.R = centerX + halfW
     PANEL.T = T
     PANEL.B = B
 
-    print(string.format("[DBTerminal] Panel bounds: L=%.3f R=%.3f (width=%.1f%%)\n",
-        PANEL.L, PANEL.R, (PANEL.R - PANEL.L) * 100))
+    print(string.format("[DBTerminal] Panel bounds: L=%.4f R=%.4f center=%.4f (width=%.1f%%)\n",
+        PANEL.L, PANEL.R, centerX, (PANEL.R - PANEL.L) * 100))
 end
 
 ----------------------------------------------------------------------
@@ -423,7 +423,7 @@ local function buildHeader(root, canvas, groups, closeCb)
     -- Expose for live nudging (dev tool, remove before release)
     ui._nudgeSlot = verSlot
 
-    -- Alterra glitch logo — top-right, fixed pixel size to prevent stretch
+    -- Alterra glitch logo — bottom-left, inline with filter sidebar
     pcall(function()
         local mat = StaticFindObject("/Game/UI/Materials_test/Glitch/M_Glitch.M_Glitch")
         if mat then
@@ -433,9 +433,10 @@ local function buildHeader(root, canvas, groups, closeCb)
             local logoBox = makeSizeBox(root, 80, 50)
             logoBox:SetContent(logoImg)
             local logoSlot = canvas:AddChildToCanvas(logoBox)
-            logoSlot:SetAnchors({ Minimum = { X = pX(0.87), Y = pY(0.06) }, Maximum = { X = pX(0.87), Y = pY(0.06) } })
+            logoSlot:SetAnchors({ Minimum = { X = pX(0.095), Y = pY(0.845) }, Maximum = { X = pX(0.095), Y = pY(0.845) } })
             logoSlot:SetAutoSize(true)
             pcall(function() logoSlot:SetAlignment({ X = 0.5, Y = 0.5 }) end)
+            -- ui._nudgeSlot = logoSlot  -- disabled, using panel mode
         end
     end)
 end
