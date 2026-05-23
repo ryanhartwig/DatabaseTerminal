@@ -17,6 +17,8 @@ local isOpen = false
 local currentTerminal = nil
 local loadingWidget = nil
 local interactionGen = 0  -- generation counter — stale callbacks bail out
+local modalBlocker = nil  -- ModalActivatableWidget on WindowManager layer 3
+                          -- blocks escape menu while our UI is open
 
 ----------------------------------------------------------------------
 -- Loading screen
@@ -287,6 +289,15 @@ local function showLoadingScreen()
     root:AddToViewport(501)
     loadingWidget = root
 
+    -- Push modal blocker to layer 3 — prevents ESC from opening settings menu
+    pcall(function()
+        local modalCls = StaticFindObject("/Script/UWECommonUI.ModalActivatableWidget")
+        local wm = FindFirstOf("WindowManager")
+        if wm and modalCls then
+            modalBlocker = wm:PushToLayer(3, modalCls)
+        end
+    end)
+
     -- Lock input so player can't move during load
     pcall(function() wbLib:SetInputMode_UIOnlyEx(pc, root, 0, true) end)
     pcall(function() pc.bShowMouseCursor = false end)
@@ -318,6 +329,15 @@ function interaction.close()
     if ui then ui.close() end
     isOpen = false
     currentTerminal = nil
+
+    -- Pop modal blocker from WindowManager layer 3
+    if modalBlocker then
+        pcall(function()
+            local wm = FindFirstOf("WindowManager")
+            if wm then wm:Pop(modalBlocker) end
+        end)
+        modalBlocker = nil
+    end
 
     -- Restore game input and hide cursor
     local wbLib = StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
@@ -505,11 +525,15 @@ function interaction.init(deps)
         return false
     end)
 
-    -- ESC to close — needs exploration, see docs/probes/esc-close-probe.md
-    -- For now, close button [X] and F6 are the close methods.
-    -- RegisterKeyBind(Key.ESCAPE) doesn't consume input — game also
-    -- processes ESC and opens settings, and all attempts to pop/dismiss
-    -- the settings menu leave input state locked.
+    -- ESC to close — modal blocker on WindowManager layer 3 prevents the
+    -- game from opening the settings menu when ESC is pressed (same pattern
+    -- as inventory/fabricator). See docs/probes/esc-close-results.md.
+    RegisterKeyBind(Key.ESCAPE, function()
+        if not isOpen then return end
+        ExecuteInGameThread(function()
+            interaction.close()
+        end)
+    end)
 
     -- Backup close key (F6)
     RegisterKeyBind(Key.F6, function()

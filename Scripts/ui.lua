@@ -358,14 +358,6 @@ local function buildHeader(root, canvas, groups, closeCb)
     titleSlot:SetAnchors({ Minimum = { X = L+0.035, Y = T+0.035 }, Maximum = { X = L+0.035, Y = T+0.035 } })
     titleSlot:SetAutoSize(true)
 
-    -- Close button [X]
-    local closeBtn = makeButton(root, "X", function()
-        if closeCb then closeCb() end
-    end)
-    local closeBtnSlot = canvas:AddChildToCanvas(closeBtn)
-    closeBtnSlot:SetAnchors({ Minimum = { X = R-0.04, Y = T+0.012 }, Maximum = { X = R-0.04, Y = T+0.012 } })
-    closeBtnSlot:SetAutoSize(true)
-
     -- Footer version
     local ver = makeText(root, "Database Terminal v0.1.0", "footer")
     local verSlot = canvas:AddChildToCanvas(ver)
