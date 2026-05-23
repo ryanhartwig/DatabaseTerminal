@@ -131,6 +131,59 @@ interaction.init({
 
 print("[DBTerminal] Ready.\n")
 
+-- DEV: F9 = write DBT to first available locker UGC, F10 = read back
+RegisterKeyBind(Key.F9, function()
+    ExecuteInGameThread(function()
+        print("[DBTerminal] [F9] Trying to write DBT to any locker...\n")
+        local allUGC = FindAllOf("UWEUGCComponent")
+        if not allUGC then print("[DBTerminal] [F9] No UGC\n") return end
+        for _, ugc in ipairs(allUGC) do
+            local wrote = false
+            pcall(function()
+                if ugc:IsValid() then
+                    -- Write with a DIFFERENT tag key so we don't overwrite user labels
+                    local ok = pcall(function()
+                        ugc:ServerSetPlayerText({ TagName = FName("DBT.Sync") }, "DBT|test123")
+                    end)
+                    if ok then
+                        local owner = ugc:GetOwner()
+                        local cls = owner:GetClass():GetFName():ToString()
+                        print(string.format("[DBTerminal] [F9] Wrote DBT.Sync to %s\n", cls))
+                        wrote = true
+                    end
+                end
+            end)
+            if wrote then break end
+        end
+    end)
+end)
+
+RegisterKeyBind(Key.F10, function()
+    ExecuteInGameThread(function()
+        print("[DBTerminal] [F10] Reading all UGC texts...\n")
+        local allUGC = FindAllOf("UWEUGCComponent")
+        if not allUGC then print("[DBTerminal] [F10] No UGC\n") return end
+        for i, ugc in ipairs(allUGC) do
+            pcall(function()
+                if ugc:IsValid() then
+                    local texts = ugc.PlayerTexts
+                    if texts and #texts > 0 then
+                        local owner = ugc:GetOwner()
+                        local cls = owner:GetClass():GetFName():ToString()
+                        for j = 1, #texts do
+                            pcall(function()
+                                local key = texts[j].Key.TagName:ToString()
+                                local val = texts[j].Value:ToString()
+                                print(string.format("[DBTerminal] [F10] [%d] %s key=%s val='%s'\n", i, cls, key, val))
+                            end)
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+end)
+
 -- DEV: Manual locker search (F8)
 RegisterKeyBind(Key.F8, function()
     ExecuteInGameThread(function()
