@@ -38,9 +38,6 @@ styles.defs = {
     container = {
         size = 12, opacity = 0.55,
     },
-    categoryBtn = {
-        size = 11, spacing = 50, opacity = 0.9,
-    },
     footer = {
         size = 10, spacing = 100, opacity = 0.35,
     },

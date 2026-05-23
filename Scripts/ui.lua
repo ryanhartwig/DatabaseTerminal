@@ -357,6 +357,7 @@ local groupWidgets = {}  -- { groupBox, countText, subRows: { subRow, countText,
 local activeCategories = {}   -- { [catId] = true } for active filters
 local allActive = true        -- true = "All" is active, show everything
 local categoryButtons = {}    -- { [catId] = buttonWidget } for opacity toggling
+local currentSearchFilter = "" -- shared with search poll so applyFilters can use it
 
 --- Apply category filters to all group widgets
 local function applyFilters()
@@ -377,17 +378,14 @@ local function applyFilters()
         ::continue::
     end
 
-    -- Show/hide groups
+    -- Show/hide groups (respects both category and current search filter)
     for _, gw in ipairs(groupWidgets) do
-        local visible = allActive or activeCategories[gw.group.category]
-        -- Only change visibility for non-empty groups (don't resurrect pulled-empty groups)
-        if gw.group.totalCount > 0 then
-            pcall(function() gw.groupBox:SetVisibility(visible and 0 or 1) end)
-        end
+        local catMatch = allActive or activeCategories[gw.group.category]
+        local searchMatch = (currentSearchFilter == "") or gw.group.displayName:lower():find(currentSearchFilter, 1, true)
+        local visible = catMatch and searchMatch and (gw.group.totalCount > 0)
+        pcall(function() gw.groupBox:SetVisibility(visible and 0 or 1) end)
         if gw.divider then
-            if gw.group.totalCount > 0 then
-                pcall(function() gw.divider:SetVisibility(visible and 0 or 1) end)
-            end
+            pcall(function() gw.divider:SetVisibility(visible and 0 or 1) end)
         end
     end
 end
@@ -513,7 +511,7 @@ local function buildSidebar(root, canvas)
         end
     end
 
-    -- Set initial opacity (All active, others dimmed)
+    -- Set initial button opacity (All = full, others = dimmed)
     applyFilters()
 end
 
@@ -776,10 +774,10 @@ function ui.open(groups, closeCb, onPull, refreshCb)
         if not ok then return true end
         if searchText == lastSearchText then return false end
         lastSearchText = searchText
+        currentSearchFilter = searchText:lower()
 
-        local filter = searchText:lower()
         for _, gw in ipairs(groupWidgets) do
-            local searchMatch = (filter == "") or gw.group.displayName:lower():find(filter, 1, true)
+            local searchMatch = (currentSearchFilter == "") or gw.group.displayName:lower():find(currentSearchFilter, 1, true)
             local catMatch = allActive or activeCategories[gw.group.category]
             local visible = searchMatch and catMatch and (gw.group.totalCount > 0)
             pcall(function()
@@ -808,6 +806,7 @@ function ui.close()
     activeCategories = {}
     allActive = true
     categoryButtons = {}
+    currentSearchFilter = ""
     messageWidget = nil
 
     if root then
