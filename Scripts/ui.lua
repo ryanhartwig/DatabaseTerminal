@@ -494,11 +494,9 @@ local function buildSidebar(root, canvas)
         end)
         if btn then
             categoryButtons[catDef.id] = btn
-            local btnBox = makeSizeBox(root, 160)
-            btnBox:SetContent(btn)
-            local boxSlot = sideVBox:AddChildToVerticalBox(btnBox)
+            local btnSlot = sideVBox:AddChildToVerticalBox(btn)
             pcall(function()
-                boxSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
+                btnSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
             end)
         end
     end
