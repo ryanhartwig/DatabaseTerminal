@@ -494,11 +494,11 @@ local function buildSidebar(root, canvas)
         end)
         if btn then
             categoryButtons[catDef.id] = btn
+            pcall(function() btn:SetDesiredSizeOverride({ X = 200, Y = 0 }) end)
             local btnSlot = sideVBox:AddChildToVerticalBox(btn)
             pcall(function()
                 btnSlot:SetPadding({ Top = 2, Bottom = 2, Left = 0, Right = 0 })
             end)
-            pcall(function() btnSlot:SetHorizontalAlignment(3) end) -- HAlign_Fill
         end
     end
 
